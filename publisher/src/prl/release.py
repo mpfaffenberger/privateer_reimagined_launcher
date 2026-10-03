@@ -163,14 +163,21 @@ def upload_missing_blobs(src: LocalStore, dst: Store, manifest: Manifest, worker
             "uploaded_bytes": sum(needed[k] for k in missing)}
 
 
-def finalize(dst: Store, data: bytes, signature: bytes, log=print) -> None:
-    """Manifest + sig, then the channel pointer LAST, so a client never sees a pointer to
-    a release that isn't fully uploaded. Refuses to overwrite a different published version."""
+def check_not_taken(dst: Store, data: bytes) -> Manifest:
+    """Refuse if this version is already published with different contents."""
     manifest = Manifest.from_bytes(data)
     mkey = manifest_key(manifest.version)
     if dst.exists(mkey) and dst.get(mkey) != data:
         raise FileExistsError(f"version {manifest.version} is already published with different "
                               "contents; versions are immutable")
+    return manifest
+
+
+def finalize(dst: Store, data: bytes, signature: bytes, log=print) -> None:
+    """Manifest + sig, then the channel pointer LAST, so a client never sees a pointer to
+    a release that isn't fully uploaded. Refuses to overwrite a different published version."""
+    manifest = check_not_taken(dst, data)
+    mkey = manifest_key(manifest.version)
     dst.put_bytes(mkey, data)
     dst.put_bytes(mkey + ".sig", signature)
     dst.put_bytes(channel_key(manifest.channel),
@@ -192,17 +199,25 @@ def publish(src: LocalStore, dst: Store, version: str, workers: int = 8,
     return stats
 
 
-def sign_publish(data: bytes, dst: Store, key_path: Path, log=print) -> None:
+def sign_publish(data: bytes, dst: Store, key_path: Path, dry_run: bool = False,
+                 log=print) -> None:
     """Sign an (unsigned) manifest and make it live, but only if every blob it references
-    is already in `dst` with the right size. Runs where the signing key lives."""
-    manifest = Manifest.from_bytes(data)
+    is already in `dst` with the right size. Runs where the signing key lives.
+    `dry_run`: every check (blobs, key, version not taken), then stop before publishing."""
+    manifest = check_not_taken(dst, data)
     present = dst.sizes("blobs/")
     bad = sorted({f.path for f in manifest.files if present.get(f.blob_key()) != f.stored_size})
     if bad:
         raise ValueError(f"{len(bad)} file(s) have no matching blob in the destination "
                          f"(upload blobs first), e.g. {bad[0]}")
-    log(f"[sign-publish] all {len({f.blob_key() for f in manifest.files})} blobs present")
-    finalize(dst, data, sign.sign(sign.load_private_key(key_path), data), log)
+    log(f"[sign-publish] {manifest.version}: all {len({f.blob_key() for f in manifest.files})} "
+        f"blobs present, {len(manifest.files)} files, "
+        f"{sum(f.size for f in manifest.files) / 1e9:.2f} GB installed")
+    signature = sign.sign(sign.load_private_key(key_path), data)
+    if dry_run:
+        log(f"[sign-publish] dry run OK: signed, NOT published ({manifest.channel} unchanged)")
+        return
+    finalize(dst, data, signature, log)
 
 
 def verify(store: Store, channel: str, public_b64: str, deep: bool = False, log=print) -> list[str]:

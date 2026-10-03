@@ -41,9 +41,13 @@ uv run prl build   --config ..\release.toml --version 2026.10.04.1 --lfs-pointer
 uv run prl publish --version 2026.10.04.1 --to r2 --blobs-only
 rem -> artifact: dist\store\manifests\2026.10.04.1.json (not live yet)
 
-rem Mike's machine (signing key):
-uv run prl sign-publish --manifest 2026.10.04.1.json --to r2
+rem Mike's machine (signing key). The game repo's release workflow prints the run id:
+uv run prl sign-publish --run <run id> --to r2 --dry-run   & rem every check, nothing goes live
+uv run prl sign-publish --run <run id> --to r2             & rem live
 ```
+
+`--run` fetches the run's `release-manifest` artifact with `gh`; `--manifest FILE` takes a
+local file instead.
 
 - `sign-publish` refuses unless **every** referenced blob is already in R2 with the right
   size, then uploads manifest + signature and moves the channel pointer last.

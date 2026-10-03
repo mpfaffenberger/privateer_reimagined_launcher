@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import release, sign
+from . import ci, release, sign
 from .store import LocalStore, open_store
 
 # Where the release signing key lives on the publishing machine (docs/DESIGN.md).
@@ -43,9 +43,14 @@ def main(argv: list[str] | None = None) -> int:
 
     sp = sub.add_parser("sign-publish", help="sign an unsigned manifest and make it live "
                                              "(checks every blob is already uploaded)")
-    sp.add_argument("--manifest", type=Path, required=True, help="unsigned manifest JSON (e.g. from CI)")
+    source = sp.add_mutually_exclusive_group(required=True)
+    source.add_argument("--run", help="game-repo release workflow run id (manifest fetched via gh)")
+    source.add_argument("--manifest", type=Path, help="unsigned manifest JSON file")
+    sp.add_argument("--repo", default=ci.GAME_REPO, help="repo the --run belongs to")
     sp.add_argument("--to", required=True, help="'r2' or a local directory")
     sp.add_argument("--key", type=Path, default=DEFAULT_KEY)
+    sp.add_argument("--dry-run", action="store_true",
+                    help="run every check and sign, but don't publish")
 
     v = sub.add_parser("verify", help="check a published channel like the launcher does")
     v.add_argument("--store", required=True, help="'r2' or a local directory")
@@ -66,7 +71,8 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "publish":
         release.publish(LocalStore(a.src), open_store(a.to), a.version, blobs_only=a.blobs_only)
     elif a.cmd == "sign-publish":
-        release.sign_publish(a.manifest.read_bytes(), open_store(a.to), a.key)
+        data = ci.download_manifest(a.run, a.repo) if a.run else a.manifest.read_bytes()
+        release.sign_publish(data, open_store(a.to), a.key, dry_run=a.dry_run)
     elif a.cmd == "verify":
         problems = release.verify(open_store(a.store), a.channel, a.pubkey, deep=a.deep)
         for msg in problems:
