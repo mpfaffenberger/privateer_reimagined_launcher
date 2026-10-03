@@ -16,6 +16,8 @@ import re
 import subprocess
 from pathlib import Path
 
+from .gitrepo import repo_root
+
 POINTER_HEADER = b"version https://git-lfs.github.com/spec/"
 POINTER_MAX = 1024
 _OID = re.compile(rb"^oid sha256:([0-9a-f]{64})$", re.M)
@@ -44,12 +46,6 @@ def find_pointers(files: list[tuple[Path, str]]) -> list[str]:
     return [dest for src, dest in files if read_pointer(src)]
 
 
-def repo_root(path: Path) -> Path:
-    out = subprocess.run(["git", "-C", str(path.parent), "rev-parse", "--show-toplevel"],
-                         check=True, capture_output=True, text=True).stdout.strip()
-    return Path(out)
-
-
 def _batches(items: list[str], max_chars: int) -> list[list[str]]:
     """Split into comma-joined groups no longer than `max_chars`."""
     batches: list[list[str]] = [[]]
@@ -71,7 +67,9 @@ def pull(paths: list[Path], log=print) -> None:
     by_repo: dict[Path, list[str]] = {}
     for p in paths:
         root = repo_root(p)
-        rel = p.resolve().relative_to(root.resolve()).as_posix()
+        if root is None:
+            raise ValueError(f"{p} is an LFS pointer outside any git repo; can't pull it")
+        rel = p.resolve().relative_to(root).as_posix()
         if _UNSAFE_FOR_INCLUDE.search(rel):
             raise ValueError(f"can't pass {rel!r} to `git lfs pull --include` literally")
         by_repo.setdefault(root, []).append(rel)

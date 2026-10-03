@@ -20,7 +20,7 @@ from pathlib import Path
 
 import zstandard
 
-from . import config, lfs, sign
+from . import config, gitrepo, lfs, sign
 from .manifest import FileEntry, Manifest, blob_key, channel_key, channel_pointer, manifest_key
 from .store import LocalStore, Store
 
@@ -97,6 +97,11 @@ def build(config_path: Path, version: str, channel: str, store: LocalStore, key_
         shown = "\n  ".join(pointers[:20])
         raise ValueError(f"{len(pointers)} file(s) are Git LFS pointers, not content "
                          f"(run `git lfs pull` in the game repo):\n  {shown}")
+    if stubs := gitrepo.symlink_stubs(files):
+        shown = "\n  ".join(stubs[:20])
+        raise ValueError(f"{len(stubs)} file(s) are git symlinks checked out as plain text "
+                         f"(core.symlinks=false); exclude them or check out with symlinks "
+                         f"enabled:\n  {shown}")
     store.root.mkdir(parents=True, exist_ok=True)
 
     described = describe(files, lfs_pointers, workers)
