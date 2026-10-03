@@ -158,20 +158,23 @@ Publishing from a local checkout avoids Git LFS bandwidth charges: a CI build wo
 - **Windows code signing** (a follow-up): unsigned installers trigger SmartScreen. Azure
   Trusted Signing is ~$10/month.
 
-## Cloudflare setup (Mike)
+## Cloudflare setup (done 2026-10-03)
 
-1. **R2:** create bucket `privateer-reimagined`; Settings → Custom Domains →
-   `cdn.privateer-reimagined.com` (public read).
-2. **R2 API token** (Object Read & Write, this bucket only). Put it in the publisher's
-   environment, never in the repo:
-   `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
-3. **Site (Workers Builds):** Workers & Pages -> Create -> import this GitHub repo. Project name
-   `privateer-reimagined-launcher` (must equal `name` in `wrangler.jsonc`), build command
-   *(empty)*, deploy command `npx wrangler deploy`.  Done. The custom domains
-   (`privateer-reimagined.com`, `www.`) are declared in `wrangler.jsonc` `routes`, so deploys
-   own them. Don't add or remove them in the dashboard.
-4. **Signing key:** `uv run prl keygen` once; keep `signing_key.pem` offline, backed up, and
-   **out of git**. Its public key goes in `crates/prl-core/src/keys.rs`.
+1. **R2:** bucket `privateer-reimagined` (ENAM), custom domain
+   `cdn.privateer-reimagined.com` (public read, TLS 1.2+). The `r2.dev` URL is disabled.
+2. **R2 API token:** Object Read & Write on this bucket only. It lives in the publishing
+   machine's *user* environment, never in the repo: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+   `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`. It can't forge releases (it can't sign), but rotate
+   it if it ever leaks.
+3. **Site (Workers Builds):** project `privateer-reimagined-launcher` (must equal `name` in
+   `wrangler.jsonc`), no build command, deploy command `npx wrangler deploy`. The custom
+   domains (`privateer-reimagined.com`, `www.`) are declared in `wrangler.jsonc` `routes`,
+   so deploys own them. Don't add or remove them in the dashboard.
+4. **Signing key:** generated once with `prl keygen` and stored at
+   `%USERPROFILE%\.prl\signing_key.pem` on the publishing machine. Back it up offline, and
+   never commit it. Its public key is in `crates/prl-core/src/keys.rs`. **Losing the private
+   key means no launcher can install future releases until a new launcher ships with a new
+   key.**
 
 ## Follow-ups (not in v1)
 
