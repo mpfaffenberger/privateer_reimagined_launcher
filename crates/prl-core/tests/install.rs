@@ -150,6 +150,24 @@ async fn repair_rehashes_while_update_trusts_the_cache() {
     assert_eq!(inst.plan(&release, Mode::Update).unwrap().place.len(), 1);
 }
 
+/// The launcher (Tauri) runs these futures on a multi-threaded runtime, so they must be
+/// `Send`. This fails to COMPILE if a regression makes them not Send.
+#[tokio::test]
+async fn installer_futures_are_send() {
+    fn assert_send<T: Send>(_: &T) {}
+    let store = TestStore::new();
+    store.publish("1.0.0", &[("game.exe", b"MZ")]);
+    let game = tempfile::tempdir().unwrap();
+    let inst = installer(&store, game.path());
+    let check = inst.check("stable");
+    assert_send(&check);
+    let release = check.await.unwrap();
+    let plan = inst.plan(&release, Mode::Update).unwrap();
+    let apply = inst.apply(&release, &plan, Arc::new(|_| {}));
+    assert_send(&apply);
+    apply.await.unwrap();
+}
+
 #[tokio::test]
 async fn progress_reports_reach_done() {
     let store = TestStore::new();

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/prl-core"]
+members = ["crates/prl-core", "launcher/src-tauri"]
 
 [profile.release]
 lto = true
