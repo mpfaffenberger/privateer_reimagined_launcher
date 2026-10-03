@@ -167,8 +167,9 @@ Publishing from a local checkout avoids Git LFS bandwidth charges: a CI build wo
    `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
 3. **Site (Workers Builds):** Workers & Pages -> Create -> import this GitHub repo. Project name
    `privateer-reimagined-launcher` (must equal `name` in `wrangler.jsonc`), build command
-   *(empty)*, deploy command `npx wrangler deploy`. Then Settings -> Domains & Routes -> add
-   custom domain `privateer-reimagined.com` (and `www.` if wanted).
+   *(empty)*, deploy command `npx wrangler deploy`.  Done. The custom domains
+   (`privateer-reimagined.com`, `www.`) are declared in `wrangler.jsonc` `routes`, so deploys
+   own them. Don't add or remove them in the dashboard.
 4. **Signing key:** `uv run prl keygen` once; keep `signing_key.pem` offline, backed up, and
    **out of git**. Its public key goes in `crates/prl-core/src/keys.rs`.
 
