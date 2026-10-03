@@ -1,0 +1,11 @@
+// Cloudflare Workers (static assets only) for privateer-reimagined.com (#5).
+// Workers Builds runs `npx wrangler deploy` on every push to main.
+// `name` MUST match the Worker/project name in the Cloudflare dashboard.
+{
+  "name": "privateer-reimagined-launcher",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./site",
+    "not_found_handling": "404-page"
+  }
+}

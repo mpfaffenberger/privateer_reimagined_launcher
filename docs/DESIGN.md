@@ -10,7 +10,7 @@ Status: v1 design (2026-10-03). Owner: Mike. Issues #1-#5.
 | Launcher stack | **Tauri v2** (Rust core + HTML UI): ~10 MB installer, Windows first, macOS possible. |
 | Original 1993 assets | **Shipped** with the game, **but** the launcher only installs for players who own *Wing Commander: Privateer* on GOG or Steam (see Ownership). |
 | Delta updates | **Yes**: content-addressed, file-level, signed manifests. No patch chains. |
-| Hosting | **Cloudflare R2** for game content (`cdn.privateer-reimagined.com`), **Cloudflare Pages** for the site (`privateer-reimagined.com`). |
+| Hosting | **Cloudflare R2** for game content (`cdn.privateer-reimagined.com`), a **Cloudflare Worker with static assets** for the site (`privateer-reimagined.com`, `wrangler.jsonc` + `site/`). |
 
 ## Why file-level, content-addressed updates
 
@@ -38,7 +38,7 @@ install), and transcode the 810 MB of WAV music to Opus/OGG (~10x smaller).
 publisher/        Python (uv) CLI `prl`: build + sign + publish releases       (#2)
 crates/prl-core/  Rust engine: verify, plan, download/apply, repair, ownership  (#3)
 launcher/         Tauri v2 app on prl-core                                     (#4)
-site/             Static site for Cloudflare Pages                             (#5)
+site/             Static site, deployed as a Cloudflare Worker (static assets) (#5)
 ```
 
 ## Store layout (R2 bucket, or any directory for tests)
@@ -154,7 +154,7 @@ Publishing from a local checkout avoids Git LFS bandwidth charges: a CI build wo
 - **R2:** about $0.015/GB-month storage and **no egress fees**. ~20 GB of releases costs about
   $0.30/month. 1,000 players x 3 GB is ~3 TB of downloads: **$0** on R2 vs ~$270 on S3.
   Operations: ~$4.50 per million writes, ~$0.36 per million reads.
-- **Pages:** free; deploys `site/` on push.
+- **Site Worker:** static-asset requests are free; Workers Builds deploys `site/` on every push to `main`.
 - **Windows code signing** (a follow-up): unsigned installers trigger SmartScreen. Azure
   Trusted Signing is ~$10/month.
 
@@ -165,8 +165,10 @@ Publishing from a local checkout avoids Git LFS bandwidth charges: a CI build wo
 2. **R2 API token** (Object Read & Write, this bucket only). Put it in the publisher's
    environment, never in the repo:
    `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`.
-3. **Pages:** Create project → connect this GitHub repo → framework *None*, build command
-   *(empty)*, output directory `site` → custom domain `privateer-reimagined.com`.
+3. **Site (Workers Builds):** Workers & Pages -> Create -> import this GitHub repo. Project name
+   `privateer-reimagined-launcher` (must equal `name` in `wrangler.jsonc`), build command
+   *(empty)*, deploy command `npx wrangler deploy`. Then Settings -> Domains & Routes -> add
+   custom domain `privateer-reimagined.com` (and `www.` if wanted).
 4. **Signing key:** `uv run prl keygen` once; keep `signing_key.pem` offline, backed up, and
    **out of git**. Its public key goes in `crates/prl-core/src/keys.rs`.
 
