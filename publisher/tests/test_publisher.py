@@ -139,6 +139,19 @@ def test_versions_are_immutable(tmp_path, game, key):
         build(tmp_path, game, key, "1.0.0", store)
 
 
+def test_lfs_pointer_files_are_refused_before_anything_is_written(tmp_path, game, key):
+    pointer = (b"version https://git-lfs.github.com/spec/v1\n"
+               b"oid sha256:" + b"ab" * 32 + b"\nsize 1221769\n")
+    (game / "assets" / "cockpit.png").write_bytes(pointer)
+    store = LocalStore(tmp_path / "store")
+    with pytest.raises(ValueError, match=r"1 file\(s\) are Git LFS pointers[\s\S]*assets/cockpit.png"):
+        build(tmp_path, game, key, "1.0.0", store)
+    assert not (tmp_path / "store").exists() or not any((tmp_path / "store").rglob("*.json"))
+    # Real content that merely mentions LFS later on (or a large file) is fine.
+    (game / "assets" / "cockpit.png").write_bytes(b"\x89PNG" + pointer)
+    build(tmp_path, game, key, "1.0.0", store)
+
+
 def test_unset_env_var_in_config_is_an_error(tmp_path):
     cfg = tmp_path / "release.toml"
     cfg.write_text('product="p"\n[[source]]\nfrom="${PRL_SURELY_UNSET_VAR}/x"\nto="x"\n')
