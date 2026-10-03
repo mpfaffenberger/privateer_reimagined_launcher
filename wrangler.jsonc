@@ -4,6 +4,13 @@
 {
   "name": "privateer-reimagined-launcher",
   "compatibility_date": "2026-10-01",
+  // Custom domains (#16). Cloudflare manages their DNS records + TLS certificates.
+  // The workers.dev URL stays on for previews.
+  "routes": [
+    { "pattern": "privateer-reimagined.com", "custom_domain": true },
+    { "pattern": "www.privateer-reimagined.com", "custom_domain": true }
+  ],
+  "workers_dev": true,
   "assets": {
     "directory": "./site",
     "not_found_handling": "404-page"
