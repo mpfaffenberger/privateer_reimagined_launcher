@@ -138,16 +138,18 @@ The original assets ship, so the launcher installs only for players who own the 
 The verified path is remembered and re-checked at each launch. This is a good-faith gate, not
 DRM: it keeps the honest path honest and shows we expect players to own the original.
 
-## Release flow (Mike's machine first; CI later)
+## Release flow
 
-```
-cd privateer_reimagined_launcher/publisher
-uv run prl build   --config ../release.toml --version 2026.10.03.1 --channel stable --out dist/
-uv run prl publish --release dist/2026.10.03.1 --store r2       # uploads only new blobs
-```
+Commands: [`publisher/README.md`](../publisher/README.md). Two ways in, one store format:
 
-Publishing from a local checkout avoids Git LFS bandwidth charges: a CI build would pull
-~3.7 GB of LFS objects per run.
+- **Mike's machine** (full checkout): `prl build` + `prl publish`. Signs locally.
+- **CI** (game repo, manual trigger only, #760): `prl build --lfs-pointers --known-store r2
+  --unsigned` + `prl publish --blobs-only`, then Mike runs `prl sign-publish`. CI never
+  downloads LFS content R2 already has (a Git LFS pointer's oid is our SHA-256), and the
+  signing key never leaves Mike's machine.
+
+Release content follows the checkout's line endings for text files (`core.autocrlf`);
+the release workflow pins that setting so releases are reproducible.
 
 ## Hosting and costs
 

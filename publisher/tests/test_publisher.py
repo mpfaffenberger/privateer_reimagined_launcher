@@ -4,64 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 from pathlib import Path
 
 import pytest
 import zstandard
 
+from conftest import CREATED, build, write_config
 from prl import config, paths, release, sign
 from prl.manifest import Manifest, channel_key, manifest_key
 from prl.store import LocalStore
-
-CREATED = "2026-10-03T00:00:00Z"
-
-
-# ---- fixtures ---------------------------------------------------------------
-
-@pytest.fixture()
-def key(tmp_path: Path) -> tuple[Path, str]:
-    path = tmp_path / "signing_key.pem"
-    return path, sign.keygen(path)
-
-
-@pytest.fixture()
-def game(tmp_path: Path) -> Path:
-    """A tiny fake game: exe, compressible text, incompressible noise, an excluded source."""
-    root = tmp_path / "game"
-    (root / "assets" / "data").mkdir(parents=True)
-    (root / "assets" / "music").mkdir(parents=True)
-    (root / "new_privateer.exe").write_bytes(b"MZ" + b"\x00" * 4096)
-    (root / "assets" / "data" / "ships.json").write_text('{"tarsus": 1}\n' * 400)
-    (root / "assets" / "music" / "noise.bin").write_bytes(os.urandom(64 * 1024))
-    (root / "assets" / "data" / "copy_of_ships.json").write_text('{"tarsus": 1}\n' * 400)  # dup content
-    (root / "assets" / "model.blend").write_bytes(b"blender source, never shipped")
-    return root
-
-
-def write_config(tmp_path: Path, game: Path) -> Path:
-    cfg = tmp_path / "release.toml"
-    cfg.write_text(f'''
-product = "privateer-reimagined"
-[launch]
-windows = "new_privateer.exe"
-[[source]]
-from = "{(game / 'new_privateer.exe').as_posix()}"
-to = "new_privateer.exe"
-[[source]]
-from = "{(game / 'assets').as_posix()}"
-to = "assets"
-exclude = ["**/*.blend"]
-''')
-    return cfg
-
-
-def build(tmp_path, game, key, version="1.0.0", store=None):
-    tmp_path.mkdir(parents=True, exist_ok=True)
-    store = store or LocalStore(tmp_path / "store")
-    m = release.build(write_config(tmp_path, game), version, "stable", store, key[0],
-                      created_utc=CREATED, log=lambda *_: None)
-    return m, store
 
 
 # ---- path rules --------------------------------------------------------------

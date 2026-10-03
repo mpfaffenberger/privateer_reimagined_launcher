@@ -9,6 +9,7 @@ from typing import Protocol
 
 
 class Store(Protocol):
+    def sizes(self, prefix: str) -> dict[str, int]: ...
     def keys(self, prefix: str) -> set[str]: ...
     def exists(self, key: str) -> bool: ...
     def get(self, key: str) -> bytes: ...
@@ -26,12 +27,15 @@ class LocalStore:
     def _path(self, key: str) -> Path:
         return self.root.joinpath(*key.split("/"))
 
-    def keys(self, prefix: str) -> set[str]:
+    def sizes(self, prefix: str) -> dict[str, int]:
         base = self._path(prefix)
         if not base.exists():
-            return set()
-        return {p.relative_to(self.root).as_posix() for p in base.rglob("*")
+            return {}
+        return {p.relative_to(self.root).as_posix(): p.stat().st_size for p in base.rglob("*")
                 if p.is_file() and not p.name.endswith(".tmp")}
+
+    def keys(self, prefix: str) -> set[str]:
+        return set(self.sizes(prefix))
 
     def exists(self, key: str) -> bool:
         return self._path(key).is_file()
@@ -77,11 +81,14 @@ class R2Store:
             region_name="auto",
         )
 
-    def keys(self, prefix: str) -> set[str]:
-        out: set[str] = set()
+    def sizes(self, prefix: str) -> dict[str, int]:
+        out: dict[str, int] = {}
         for page in self.s3.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix):
-            out.update(obj["Key"] for obj in page.get("Contents", []))
+            out.update((obj["Key"], obj["Size"]) for obj in page.get("Contents", []))
         return out
+
+    def keys(self, prefix: str) -> set[str]:
+        return set(self.sizes(prefix))
 
     def exists(self, key: str) -> bool:
         from botocore.exceptions import ClientError
