@@ -1,0 +1,22 @@
+# Rust / Tauri
+target/
+launcher/src-tauri/gen/
+
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Release artefacts + local stores
+dist/
+publisher/dist/
+local_store/
+
+# Secrets: the release signing key must NEVER be committed
+*.pem
+signing_key*
+.env
