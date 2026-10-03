@@ -1,0 +1,24 @@
+# What a Privateer Reimagined release contains. See publisher/README.md.
+#   set GAME_REPO=C:\Users\mpfaffenberger\code\new_privateer   (after building new_privateer.exe)
+product = "privateer-reimagined"
+
+[launch]
+windows = "new_privateer.exe"
+
+[[source]]
+from = "${GAME_REPO}/build/new_privateer.exe"
+to = "new_privateer.exe"
+
+[[source]]
+from = "${GAME_REPO}/assets"
+to = "assets"
+# Only files that are certainly never loaded at runtime. Trimming further (.obj/.3ds
+# sources, raw captures, the legacy sprites/ atlases) needs a runtime-asset audit in the
+# game repo first: excluding something the game loads would break installs.
+exclude = [
+  "**/*.blend",
+  "**/*.blend1",
+  "**/.DS_Store",
+  "**/Thumbs.db",
+  "**/desktop.ini",
+]
