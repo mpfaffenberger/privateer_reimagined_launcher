@@ -23,6 +23,20 @@ from .store import LocalStore, Store
 CHUNK = 1 << 20
 # Store raw when zstd saves less than this fraction (PNG/MP3/OGG are already compressed).
 MIN_SAVING = 0.05
+# An un-pulled Git LFS file is a tiny text stub that starts like this (#19).
+LFS_POINTER = b"version https://git-lfs.github.com/spec/"
+LFS_POINTER_MAX = 1024
+
+
+def lfs_pointers(files: list[tuple[Path, str]]) -> list[str]:
+    """Install paths whose source is an LFS pointer instead of real content."""
+    found = []
+    for src, dest in files:
+        if src.stat().st_size <= LFS_POINTER_MAX:
+            with open(src, "rb") as f:
+                if f.read(len(LFS_POINTER)) == LFS_POINTER:
+                    found.append(dest)
+    return found
 
 
 def sha256_file(path: Path) -> tuple[str, int]:
@@ -70,6 +84,10 @@ def build(config_path: Path, version: str, channel: str, store: LocalStore, key_
     cfg = config.load(config_path)
     files = config.collect(cfg)
     log(f"[build] {len(files)} files from {len(cfg.sources)} source(s)")
+    if pointers := lfs_pointers(files):
+        shown = "\n  ".join(pointers[:20])
+        raise ValueError(f"{len(pointers)} file(s) are Git LFS pointers, not content "
+                         f"(run `git lfs pull` in the game repo):\n  {shown}")
     store.root.mkdir(parents=True, exist_ok=True)
 
     with ThreadPoolExecutor(workers) as pool:
