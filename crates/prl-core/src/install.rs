@@ -89,6 +89,26 @@ fn hash_file(path: &Path) -> Result<String> {
     Ok(hex::encode(hasher.finalize()))
 }
 
+/// Hash many files on a bounded pool of scoped threads (hashing is I/O + CPU bound and
+/// parallelises well: "Verify files" on the full game went from ~3 min single-threaded).
+fn hash_files(paths: &[PathBuf]) -> Vec<Result<String>> {
+    let workers = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4).clamp(1, 8);
+    let next = AtomicUsize::new(0);
+    let slots: Vec<std::sync::Mutex<Option<Result<String>>>> = paths.iter().map(|_| std::sync::Mutex::new(None)).collect();
+    std::thread::scope(|s| {
+        for _ in 0..workers.min(paths.len().max(1)) {
+            s.spawn(|| loop {
+                let i = next.fetch_add(1, Ordering::Relaxed);
+                if i >= paths.len() {
+                    break;
+                }
+                *slots[i].lock().unwrap() = Some(hash_file(&paths[i]));
+            });
+        }
+    });
+    slots.into_iter().map(|m| m.into_inner().unwrap().expect("every slot hashed")).collect()
+}
+
 fn mtime_ns(md: &std::fs::Metadata) -> u128 {
     md.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|d| d.as_nanos()).unwrap_or(0)
 }
@@ -207,26 +227,33 @@ impl Installer {
     pub fn plan(&self, release: &Release, mode: Mode) -> Result<Plan> {
         let mut cache = if mode == Mode::Repair { HashCache::default() } else { self.load_cache() };
         let mut place = Vec::new();
+        // Pass 1 (cheap): missing / wrong size -> rewrite; cache hit -> compare; else hash later.
+        let mut to_hash: Vec<(&FileEntry, PathBuf, u128)> = Vec::new();
         for f in &release.manifest.files {
             let path = format::install_path(&self.root, &f.path);
-            let ok = match std::fs::metadata(&path) {
+            match std::fs::metadata(&path) {
                 Ok(md) if md.is_file() && md.len() == f.size => {
                     let m = mtime_ns(&md);
-                    let sha = match cache.entries.get(&f.path) {
-                        Some(c) if c.size == f.size && c.mtime_ns == m => c.sha256.clone(),
-                        _ => {
-                            let sha = hash_file(&path)?;
-                            cache.entries.insert(f.path.clone(), CacheEntry { size: f.size, mtime_ns: m, sha256: sha.clone() });
-                            sha
+                    match cache.entries.get(&f.path) {
+                        Some(c) if c.size == f.size && c.mtime_ns == m => {
+                            if c.sha256 != f.sha256 {
+                                place.push(f.clone());
+                            }
                         }
-                    };
-                    sha == f.sha256
+                        _ => to_hash.push((f, path, m)),
+                    }
                 }
-                _ => false,
-            };
-            if !ok {
-                place.push(f.clone());
+                _ => place.push(f.clone()),
             }
+        }
+        // Pass 2: hash everything uncached in parallel.
+        let paths: Vec<PathBuf> = to_hash.iter().map(|(_, p, _)| p.clone()).collect();
+        for ((f, _, m), sha) in to_hash.iter().zip(hash_files(&paths)) {
+            let sha = sha?;
+            if sha != f.sha256 {
+                place.push((*f).clone());
+            }
+            cache.entries.insert(f.path.clone(), CacheEntry { size: f.size, mtime_ns: *m, sha256: sha });
         }
         self.save_cache(&cache)?;
 
@@ -301,11 +328,14 @@ impl Installer {
             })
         };
         report();
-        stream::iter(plan.fetch.iter())
-            .map(|f| async {
-                self.fetch_blob(f, &staging, &done, &report).await?;
-                blobs_done.fetch_add(1, Ordering::Relaxed);
-                report();
+        // Stream OWNED entries: a closure over `&FileEntry` returning a future is higher-ranked
+        // over that borrow, and rustc can't prove such futures `Send` (which Tauri requires).
+        let (staging_ref, done_ref, blobs_ref, report_ref) = (&staging, &done, &blobs_done, &report);
+        stream::iter(plan.fetch.clone())
+            .map(|f| async move {
+                self.fetch_blob(&f, staging_ref, done_ref, report_ref).await?;
+                blobs_ref.fetch_add(1, Ordering::Relaxed);
+                report_ref();
                 Ok::<(), Error>(())
             })
             .buffer_unordered(PARALLEL_DOWNLOADS)

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Privateer Reimagined</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <main>
+    <header>
+      <p class="eyebrow">Gemini Sector &middot; 2669</p>
+      <h1>Privateer <span>Reimagined</span></h1>
+    </header>
+
+    <section class="card" id="owner-card">
+      <h2>Wing Commander: Privateer</h2>
+      <p id="owner-status" class="dim">Looking for your copy&hellip;</p>
+      <div class="row" id="owner-actions" hidden>
+        <button id="browse-privateer" class="secondary">Choose folder&hellip;</button>
+        <button id="get-gog" class="link">Get it on GOG</button>
+      </div>
+    </section>
+
+    <section class="card" id="install-card">
+      <h2>Game</h2>
+      <p class="dim">Install folder: <span id="install-dir">&hellip;</span>
+        <button id="change-dir" class="link">Change</button></p>
+      <p id="update-status" class="dim">&nbsp;</p>
+      <div class="progress" id="progress" hidden><div id="progress-bar"></div></div>
+      <p id="progress-text" class="dim small">&nbsp;</p>
+      <div class="row">
+        <button id="primary" class="primary" disabled>Checking&hellip;</button>
+        <button id="verify" class="secondary" disabled>Verify files</button>
+      </div>
+      <p id="error" class="error" hidden></p>
+    </section>
+
+    <footer class="dim small">A fan project, not affiliated with Electronic Arts. <span id="cdn"></span></footer>
+  </main>
+</body>
+</html>

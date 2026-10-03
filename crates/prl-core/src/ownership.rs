@@ -8,7 +8,7 @@
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::vdf;
 
@@ -17,7 +17,7 @@ const MAX_DEPTH: usize = 4;
 /// Upper bound on directory entries inspected per candidate, so picking `C:\` is cheap.
 const MAX_ENTRIES: usize = 20_000;
 
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Storefront {
     Gog,
@@ -25,7 +25,7 @@ pub enum Storefront {
     Folder,
 }
 
-#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Found {
     pub store: Storefront,
     /// The folder that was checked (what we remember and re-check at launch).
