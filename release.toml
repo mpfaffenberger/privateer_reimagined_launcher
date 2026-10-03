@@ -16,6 +16,10 @@ to = "assets"
 # sources, raw captures, the legacy sprites/ atlases) needs a runtime-asset audit in the
 # game repo first: excluding something the game loads would break installs.
 exclude = [
+  # 544 git symlinks: a by-speaker view of speech/original for humans. The game only
+  # scans speech/original and speech/bar, and the links break wherever core.symlinks
+  # is false (release 0.1.0 shipped them as 30-byte text files; #25).
+  "speech/flight_by_speaker/**",
   "**/*.blend",
   "**/*.blend1",
   "**/.DS_Store",
