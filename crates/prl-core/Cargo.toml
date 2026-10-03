@@ -1,0 +1,25 @@
+[package]
+name = "prl-core"
+version = "0.1.0"
+edition = "2021"
+description = "Privateer Reimagined launcher engine: verify, plan, download/apply, repair, ownership"
+publish = false
+
+[dependencies]
+base64 = "0.22"
+ed25519-dalek = "2"
+futures-util = "0.3"
+hex = "0.4"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+thiserror = "2"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "io-util", "sync"] }
+zstd = "0.13"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+[dev-dependencies]
+tempfile = "3"
