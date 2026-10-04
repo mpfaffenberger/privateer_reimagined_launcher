@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use tauri::webview::NewWindowResponse;
 use tauri::{AppHandle, Emitter, Manager, State, Url, WebviewWindowBuilder};
 use tauri_plugin_opener::OpenerExt;
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 const DEFAULT_CDN: &str = "https://cdn.privateer-reimagined.com";
 const CHANNEL: &str = "stable";
@@ -33,6 +34,8 @@ struct AppState {
     config_path: PathBuf,
     default_install_dir: PathBuf,
     release: Mutex<Option<Release>>,
+    /// A launcher update found by check_launcher_update, waiting for the player's go (#48).
+    launcher_update: Mutex<Option<Update>>,
     busy: AtomicBool,
 }
 
@@ -198,6 +201,50 @@ async fn install(repair: bool, app: AppHandle, state: State<'_, AppState>) -> Re
     Ok(release.manifest.version)
 }
 
+#[derive(Serialize)]
+struct LauncherUpdate {
+    version: String,
+    notes: Option<String>,
+}
+
+/// Ask the update feed (tauri.conf.json plugins.updater) whether a newer launcher exists.
+#[tauri::command]
+async fn check_launcher_update(app: AppHandle, state: State<'_, AppState>) -> Result<Option<LauncherUpdate>, String> {
+    let update = app.updater().map_err(|e| e.to_string())?.check().await.map_err(|e| e.to_string())?;
+    let info = update.as_ref().map(|u| LauncherUpdate { version: u.version.clone(), notes: u.body.clone() });
+    *state.launcher_update.lock().unwrap() = update;
+    Ok(info)
+}
+
+#[derive(Clone, Serialize)]
+struct LauncherProgress {
+    done: u64,
+    total: Option<u64>,
+}
+
+/// Download the pending launcher update, verify its signature against the compiled-in key,
+/// run its installer (passive) and restart. Shares the busy lock with game installs, so a
+/// launcher update can never interrupt one.
+#[tauri::command]
+async fn install_launcher_update(app: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
+    let _busy = begin(&state)?;
+    // Cloned, not taken: if this attempt fails (network, bad signature), the button can retry.
+    let update = state.launcher_update.lock().unwrap().clone().ok_or("No launcher update is waiting.")?;
+    let emitter = app.clone();
+    let mut done = 0u64;
+    update
+        .download_and_install(
+            move |chunk, total| {
+                done += chunk as u64;
+                let _ = emitter.emit("launcher-progress", LauncherProgress { done, total });
+            },
+            || {},
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+    app.restart()
+}
+
 /// The news page's URL if it answers 200 now, else None so the UI shows its built-in fallback
 /// instead of WebView2's "can't reach this page".
 #[tauri::command]
@@ -225,6 +272,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let config_path = app.path().app_config_dir()?.join("launcher.json");
             let default_install_dir = app.path().local_data_dir()?.join("Privateer Reimagined");
@@ -237,6 +285,7 @@ pub fn run() {
                 config_path,
                 default_install_dir,
                 release: Mutex::new(None),
+                launcher_update: Mutex::new(None),
                 busy: AtomicBool::new(false),
             });
             // Built here ("create": false in tauri.conf.json) to attach the new-window hook:
@@ -261,7 +310,9 @@ pub fn run() {
             check_update,
             install,
             launch_game,
-            news_url
+            news_url,
+            check_launcher_update,
+            install_launcher_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Privateer Reimagined launcher");
@@ -300,6 +351,17 @@ mod tests {
         assert_eq!(windows.len(), 1);
         assert_eq!(windows[0]["label"], "main");
         assert_eq!(windows[0]["create"], false, "else Tauri creates it without the new-window hook");
+    }
+
+    #[test]
+    fn updater_trusts_a_minisign_key_and_reads_the_cdn_feed() {
+        use base64::Engine;
+        let updater = &conf()["plugins"]["updater"];
+        let key = base64::engine::general_purpose::STANDARD.decode(updater["pubkey"].as_str().unwrap()).unwrap();
+        assert!(String::from_utf8(key).unwrap().starts_with("untrusted comment: minisign public key"));
+        assert_eq!(updater["endpoints"], serde_json::json!(["https://cdn.privateer-reimagined.com/launcher/latest.json"]));
+        assert_eq!(updater["windows"]["installMode"], "passive");
+        assert_eq!(conf()["bundle"]["createUpdaterArtifacts"], true, "else no .sig, and launchers refuse the update");
     }
 
     #[test]

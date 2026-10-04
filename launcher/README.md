@@ -53,10 +53,32 @@ npx tauri build
 ```
 
 Produces `target\release\bundle\nsis\Privateer Reimagined_<version>_x64-setup.exe`
-(per-user install, no admin prompt). Bump the version in `src-tauri/tauri.conf.json`,
-`src-tauri/Cargo.toml` and `package.json` together (a unit test checks they agree). Publish it
-with `uv run prl upload-launcher --installer <exe> --version <v> --to r2` (from `publisher/`;
-versioned names are immutable) and point the website's download button at it.
+(per-user install, no admin prompt) and, beside it, its updater signature `<exe>.sig`.
+
+## Release a new launcher (it updates itself, #48)
+
+Installed launchers (0.3.0 and later) read `https://cdn.privateer-reimagined.com/launcher/latest.json`
+at start, offer a newer version in a banner, and on **Update** download it, check its signature
+against the key compiled into them, run the installer passively and restart.
+
+1. Bump the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `package.json`
+   (a unit test checks they agree).
+2. Build with the updater key in the environment (it's a file, never commit or print it):
+   ```powershell
+   $env:TAURI_SIGNING_PRIVATE_KEY = [IO.File]::ReadAllText("$env:USERPROFILE\.prl\launcher_updater.key")
+   $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+   npx tauri build
+   ```
+3. From `publisher/`, with the R2 variables set:
+   `uv run prl upload-launcher --installer <exe> --version <v> --notes "<one line>" --to r2`.
+   It uploads the installer and its `.sig` (immutable names), then points `latest.json` at them
+   last. It refuses an unsigned installer and refuses to offer an older version than the feed has.
+4. Point the website's download button at the new installer.
+
+**The updater key** (`%USERPROFILE%\.prl\launcher_updater.key`; public half in
+`tauri.conf.json` `plugins.updater.pubkey`) is separate from the game's release key. Back it up
+with the release key. If it's lost, installed launchers can't be updated any more: players would
+have to download a launcher built with a new key by hand.
 
 **Before the first public release:**
 

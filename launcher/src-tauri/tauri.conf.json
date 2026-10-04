@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Privateer Reimagined",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "identifier": "com.privateer-reimagined.launcher",
   "build": {
     "frontendDist": "../ui"
@@ -25,8 +25,16 @@
       "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; frame-src https://privateer-reimagined.com"
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERBNEU0MjIxNTU4MkNEMDEKUldRQnpZSlZJVUpPMnNobkFxZFRpQTBSRUxYNlJBSDdiY1pIY2tDa28xcUVEV2JoNzgrVlpqY24K",
+      "endpoints": ["https://cdn.privateer-reimagined.com/launcher/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",
