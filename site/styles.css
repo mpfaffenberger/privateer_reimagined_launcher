@@ -186,13 +186,15 @@ figcaption { font-size: 0.9rem; color: var(--stone); margin-top: 10px; }
   .port-main { display: grid; grid-template-rows: 1fr auto; }
 }
 
-/* In flight: one wide frame across the page, two beneath it. Unlike the ports gallery
-   (big + stacked), this one reads left to right like stills from a reel. */
-.flight { display: grid; gap: 28px 32px; grid-template-columns: 1fr; }
-@media (min-width: 700px) {
-  .flight { grid-template-columns: 1fr 1fr; }
-  .flight .intro, .shot-wide { grid-column: 1 / -1; }
-}
+/* The fleet: one wide set piece, then every ship like a hangar roster. 17 ships with the
+   first (the Tarsus, where every career starts) at 2x2 make 20 cells: exactly 10 rows of
+   two or 5 rows of four, so no ship is ever left alone on a row. */
+.flight { display: grid; gap: 28px; }
+.fleet { display: grid; grid-template-columns: repeat(2, 1fr); gap: 22px 16px; align-items: start; }
+.fleet figure:first-child { grid-column: span 2; grid-row: span 2; }
+@media (min-width: 1000px) { .fleet { grid-template-columns: repeat(4, 1fr); } }
+.fleet figcaption { margin-top: 8px; }
+.fleet figcaption b { font-family: var(--display); font-weight: 700; color: var(--bone); margin-right: 0.4em; }
 
 /* Story: words and a bar scene on the left, the cast on the right, every other face
    dropped lower, like stills pinned to a board. */
