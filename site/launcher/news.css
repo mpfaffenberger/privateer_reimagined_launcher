@@ -1,0 +1,41 @@
+/* The launcher's news panel (#42): fonts, palette and base type come from /styles.css. */
+body.news {
+  margin: 0;
+  padding: 0 0 20px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  background: var(--night);
+}
+
+.lead img { width: 100%; height: auto; display: block; }
+.lead h1 {
+  font: 800 1.45rem/1.1 var(--display);
+  font-stretch: 125%;
+  margin: 16px 18px 6px;
+}
+.lead p { margin: 0 18px 10px; color: var(--stone); }
+.more {
+  display: inline-block;
+  margin: 0 18px;
+  color: var(--sodium-lit);
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.notes { margin: 22px 18px 0; border-top: 1px solid var(--slate); }
+.notes h2 {
+  font: 700 0.75rem/1 var(--display);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin: 16px 0 6px;
+  max-width: none;          /* the site's 18ch cap is for big headings */
+}
+.notes ul { list-style: none; margin: 0; padding: 0; }
+.notes li { display: grid; grid-template-columns: 3.4rem 1fr; gap: 10px; padding: 8px 0; }
+.notes time { color: var(--sodium); font-size: 0.85rem; padding-top: 1px; }
+.notes p { margin: 0; }
+.notes b { color: var(--bone); font-weight: 600; }
