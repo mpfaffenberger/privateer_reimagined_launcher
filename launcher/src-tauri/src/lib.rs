@@ -154,7 +154,8 @@ struct UpdateInfo {
 async fn check_update(repair: bool, state: State<'_, AppState>) -> Result<UpdateInfo, String> {
     let _busy = begin(&state)?;
     let installer = Arc::new(state.installer());
-    let release = installer.check(CHANNEL).await.map_err(|e| e.to_string())?;
+    // This OS's channel: `stable` on Windows, `stable-macos` on a Mac (#66).
+    let release = installer.check(&prl_core::format::platform_channel(CHANNEL)).await.map_err(|e| e.to_string())?;
     let (inst, rel) = (installer.clone(), release.clone());
     let mode = if repair { Mode::Repair } else { Mode::Update };
     let plan = tokio::task::spawn_blocking(move || inst.plan(&rel, mode))

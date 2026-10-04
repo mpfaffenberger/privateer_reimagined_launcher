@@ -371,6 +371,41 @@ impl Installer {
         let manifest = self.installed().ok_or_else(|| Error::Format("the game is not installed".into()))?;
         let exe = manifest.launch_target().ok_or_else(|| Error::Format("this release has no launcher entry for this OS".into()))?;
         let path = format::install_path(&self.root, exe);
+        make_executable(&path)?;
         std::process::Command::new(&path).current_dir(&self.root).spawn().map_err(io_err(&path))
+    }
+}
+
+/// Installed files are written without an execute bit, which Windows ignores but macOS and
+/// Linux won't run (#66). Set it on the launch target right before starting it, so a repair or
+/// any other way the file was (re)placed is covered too.
+#[cfg(unix)]
+fn make_executable(path: &std::path::Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = std::fs::metadata(path).map_err(io_err(path))?.permissions();
+    if perms.mode() & 0o111 != 0o111 {
+        perms.set_mode(perms.mode() | 0o755);
+        std::fs::set_permissions(path, perms).map_err(io_err(path))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &std::path::Path) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod unix_tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn launch_target_becomes_executable() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("game");
+        std::fs::write(&exe, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o644)).unwrap();
+        super::make_executable(&exe).unwrap();
+        assert_eq!(std::fs::metadata(&exe).unwrap().permissions().mode() & 0o777, 0o755);
     }
 }

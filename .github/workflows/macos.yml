@@ -1,0 +1,52 @@
+# macOS: Rust tests + an unsigned launcher build to try on a Mac (#66).
+#
+# Windows is still built and released from Mike's machine; macOS can't be built from Windows,
+# so it runs here. The .app is unsigned (ad-hoc), so opening it needs System Settings >
+# Privacy & Security > Open Anyway the first time. Not a release: no updater signature here
+# (createUpdaterArtifacts is switched off for this build).
+name: macos
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      - name: Rust tests (prl-core, launcher)
+        run: cargo test -p prl-core -p privateer-launcher
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build the unsigned launcher (.app + .dmg)
+        working-directory: launcher
+        run: |
+          npm ci
+          npx tauri build --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload the .dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: privateer-launcher-macos-arm64-${{ github.sha }}
+          path: target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
