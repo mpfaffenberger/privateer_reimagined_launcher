@@ -27,6 +27,21 @@ with `prl build` + `prl publish --to <folder>`):
 | `PRL_CDN` | store URL or local folder (default `https://cdn.privateer-reimagined.com`) | honoured (signatures are still checked) |
 | `PRL_PUBLIC_KEY` | trust a scratch signing key | **ignored**: only the compiled-in key (`crates/prl-core/src/keys.rs`) is trusted |
 
+## News panel
+
+The left half of the window shows <https://privateer-reimagined.com/launcher/>, which is
+`site/launcher/index.html` in this repo. Edit that page and merge, and every launcher shows the
+change the next time it starts; no launcher release needed (#44). The buttons and every rule
+stay compiled into the launcher.
+
+- The panel is `<iframe sandbox="allow-same-origin allow-popups">`: no scripts, forms or
+  top-level navigation, and no access to the launcher's commands. Keep the page script-free.
+- Links with `target="_blank"` open in the player's browser (http/https only, via the
+  `on_new_window` hook in `lib.rs`); other links navigate inside the panel.
+- The site lets only the launcher frame that page (`site/_headers`, `frame-ancestors`), and
+  the launcher's CSP frames only the site (`frame-src`, checked by a unit test).
+- If the page doesn't answer within 4 s (offline), the panel shows a built-in message.
+
 Settings live in `%APPDATA%\com.privateer-reimagined.launcher\launcher.json` (the
 Privateer folder found, and the install folder). The default install folder is
 `%LOCALAPPDATA%\Privateer Reimagined`.
@@ -38,8 +53,10 @@ npx tauri build
 ```
 
 Produces `target\release\bundle\nsis\Privateer Reimagined_<version>_x64-setup.exe`
-(per-user install, no admin prompt). Upload it to R2 under `launcher/` and point the
-website's download button at it.
+(per-user install, no admin prompt). Bump the version in `src-tauri/tauri.conf.json`,
+`src-tauri/Cargo.toml` and `package.json` together (a unit test checks they agree). Publish it
+with `uv run prl upload-launcher --installer <exe> --version <v> --to r2` (from `publisher/`;
+versioned names are immutable) and point the website's download button at it.
 
 **Before the first public release:**
 

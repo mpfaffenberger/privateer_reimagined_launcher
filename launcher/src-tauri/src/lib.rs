@@ -4,15 +4,22 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use prl_core::install::{Installer, Mode, Progress, Release};
 use prl_core::ownership::{self, Found, Storefront};
 use prl_core::source::Source;
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::webview::NewWindowResponse;
+use tauri::{AppHandle, Emitter, Manager, State, Url, WebviewWindowBuilder};
+use tauri_plugin_opener::OpenerExt;
 
 const DEFAULT_CDN: &str = "https://cdn.privateer-reimagined.com";
 const CHANNEL: &str = "stable";
+/// The news panel (#44): a page on the site, shown in a script-less sandboxed iframe, so news
+/// can change without a launcher release. Its origin must match `frame-src` in tauri.conf.json.
+const NEWS_URL: &str = "https://privateer-reimagined.com/launcher/";
+const NEWS_TIMEOUT: Duration = Duration::from_secs(4);
 
 #[derive(Default, Serialize, Deserialize)]
 struct Config {
@@ -191,6 +198,21 @@ async fn install(repair: bool, app: AppHandle, state: State<'_, AppState>) -> Re
     Ok(release.manifest.version)
 }
 
+/// The news page's URL if it answers 200 now, else None so the UI shows its built-in fallback
+/// instead of WebView2's "can't reach this page".
+#[tauri::command]
+async fn news_url() -> Option<String> {
+    let client = reqwest::Client::builder().timeout(NEWS_TIMEOUT).build().ok()?;
+    let ok = client.get(NEWS_URL).send().await.is_ok_and(|r| r.status().is_success());
+    ok.then(|| NEWS_URL.to_string())
+}
+
+/// Links the panel opens in a new window go to the system browser, and only web links: never
+/// file:, javascript: or custom schemes.
+fn external_url(url: &Url) -> Option<&str> {
+    matches!(url.scheme(), "http" | "https").then(|| url.as_str())
+}
+
 #[tauri::command]
 async fn launch_game(state: State<'_, AppState>) -> Result<(), String> {
     if state.ownership().is_none() {
@@ -217,6 +239,19 @@ pub fn run() {
                 release: Mutex::new(None),
                 busy: AtomicBool::new(false),
             });
+            // Built here ("create": false in tauri.conf.json) to attach the new-window hook:
+            // nothing the news panel opens ever becomes a window inside the launcher.
+            let window = app.config().app.windows.iter().find(|w| w.label == "main").cloned()
+                .ok_or("tauri.conf.json has no window labelled main")?;
+            let handle = app.handle().clone();
+            WebviewWindowBuilder::from_config(app.handle(), &window)?
+                .on_new_window(move |url, _features| {
+                    if let Some(link) = external_url(&url) {
+                        let _ = handle.opener().open_url(link, None::<&str>);
+                    }
+                    NewWindowResponse::Deny
+                })
+                .build()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -225,8 +260,52 @@ pub fn run() {
             set_install_dir,
             check_update,
             install,
-            launch_game
+            launch_game,
+            news_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running the Privateer Reimagined launcher");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn conf() -> serde_json::Value {
+        serde_json::from_str(include_str!("../tauri.conf.json")).unwrap()
+    }
+
+    #[test]
+    fn only_web_links_leave_the_launcher() {
+        for ok in ["https://privateer-reimagined.com/#fleet", "http://example.com/"] {
+            assert_eq!(external_url(&Url::parse(ok).unwrap()), Some(ok));
+        }
+        for bad in ["file:///C:/Windows/system32/calc.exe", "javascript:alert(1)", "ms-settings:",
+                    "tauri://localhost/", "data:text/html,hi"] {
+            assert_eq!(external_url(&Url::parse(bad).unwrap()), None, "{bad}");
+        }
+    }
+
+    #[test]
+    fn csp_frames_exactly_the_news_origin() {
+        let csp = conf()["app"]["security"]["csp"].as_str().unwrap().to_string();
+        let origin = Url::parse(NEWS_URL).unwrap().origin().ascii_serialization();
+        let frame_src = csp.split(';').map(str::trim).find(|d| d.starts_with("frame-src")).unwrap();
+        assert_eq!(frame_src, format!("frame-src {origin}"));
+    }
+
+    #[test]
+    fn main_window_is_built_in_code() {
+        let windows = conf()["app"]["windows"].as_array().unwrap().clone();
+        assert_eq!(windows.len(), 1);
+        assert_eq!(windows[0]["label"], "main");
+        assert_eq!(windows[0]["create"], false, "else Tauri creates it without the new-window hook");
+    }
+
+    #[test]
+    fn versions_agree() {
+        let package: serde_json::Value = serde_json::from_str(include_str!("../../package.json")).unwrap();
+        assert_eq!(conf()["version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(package["version"], env!("CARGO_PKG_VERSION"));
+    }
 }

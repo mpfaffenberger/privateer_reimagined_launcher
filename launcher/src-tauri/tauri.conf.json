@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Privateer Reimagined",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "identifier": "com.privateer-reimagined.launcher",
   "build": {
     "frontendDist": "../ui"
@@ -10,17 +10,19 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
+        "create": false,
         "title": "Privateer Reimagined",
-        "width": 980,
-        "height": 640,
-        "minWidth": 820,
-        "minHeight": 560,
+        "width": 1060,
+        "height": 660,
+        "minWidth": 900,
+        "minHeight": 580,
         "resizable": true,
         "center": true
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; frame-src https://privateer-reimagined.com"
     }
   },
   "bundle": {
