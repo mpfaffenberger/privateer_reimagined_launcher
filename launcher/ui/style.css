@@ -81,6 +81,9 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .secondary { background: rgba(255, 255, 255, 0.04); border-color: var(--line); color: var(--text); }
 .link { background: none; color: var(--accent); padding: 0 4px; text-decoration: underline; }
 
+details summary { cursor: pointer; }
+details p { margin: 4px 0 0; user-select: text; overflow-wrap: anywhere; }
+
 .progress { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-top: 10px; }
 #progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width 0.2s; }
 

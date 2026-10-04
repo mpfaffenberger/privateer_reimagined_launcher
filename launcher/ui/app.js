@@ -10,7 +10,12 @@ const STORE_NAMES = { gog: "GOG", steam: "Steam", folder: "your folder" };
 
 let owned = false;
 let update = null;    // last check_update result
+let installedVersion = null;   // from get_status: known without the network
+let checkFailed = false;       // the last update check couldn't reach the server (#45)
 let busy = false;
+
+// Offline with a game installed: play what's there rather than block on the update server.
+const canPlayOffline = () => !update && checkFailed && !!installedVersion;
 
 function bytes(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + " GB";
@@ -38,9 +43,10 @@ function render() {
     primary.textContent = "Privateer required";
     return;
   }
-  primary.disabled = busy || !update;
+  primary.disabled = busy;
+  $("retry").hidden = busy || !checkFailed;
   if (busy) return;
-  if (!update) primary.textContent = "Check for updates";
+  if (!update) primary.textContent = canPlayOffline() ? "Play" : "Check for updates";
   else if (!update.installed_version) primary.textContent = `Install (${bytes(update.download_bytes)})`;
   else if (!update.up_to_date) primary.textContent = `Update (${bytes(update.download_bytes)})`;
   else primary.textContent = "Play";
@@ -69,6 +75,8 @@ async function checkUpdate(repair = false) {
   $("primary").textContent = repair ? "Verifying files…" : "Checking…";
   try {
     update = await invoke("check_update", { repair });
+    checkFailed = false;
+    $("check-details").hidden = true;
     const s = update.up_to_date
       ? `Version ${update.version}, up to date.`
       : update.installed_version
@@ -78,8 +86,12 @@ async function checkUpdate(repair = false) {
     $("update-status").textContent = s;
   } catch (e) {
     update = null;
-    $("update-status").textContent = "Couldn't reach the update server.";
-    showError(String(e));
+    checkFailed = true;
+    $("update-status").textContent = installedVersion
+      ? `Couldn't check for updates. You can still play version ${installedVersion}.`
+      : "Couldn't reach the update server. Check your connection and try again.";
+    $("check-detail").textContent = String(e);     // the transport detail, folded away
+    $("check-details").hidden = false;
   } finally {
     setBusy(false);
   }
@@ -92,6 +104,7 @@ async function installOrUpdate(repair = false) {
   $("progress").hidden = false;
   try {
     const version = await invoke("install", { repair });
+    installedVersion = version;
     $("update-status").textContent = `Version ${version} installed.`;
     await checkUpdate();
   } catch (e) {
@@ -102,12 +115,14 @@ async function installOrUpdate(repair = false) {
   }
 }
 
+async function play() {
+  try { await invoke("launch_game"); } catch (e) { showError(String(e)); }
+}
+
 async function primaryClicked() {
+  if (canPlayOffline()) return play();
   if (!update) return checkUpdate();
-  if (update.up_to_date) {
-    try { await invoke("launch_game"); } catch (e) { showError(String(e)); }
-    return;
-  }
+  if (update.up_to_date) return play();
   return installOrUpdate();
 }
 
@@ -155,6 +170,7 @@ async function loadNews() {
 async function main() {
   loadNews().catch(() => {});   // never holds up the game controls
   $("primary").addEventListener("click", primaryClicked);
+  $("retry").addEventListener("click", () => checkUpdate());
   $("verify").addEventListener("click", verifyClicked);
   $("browse-privateer").addEventListener("click", browsePrivateer);
   $("get-gog").addEventListener("click", () => openUrl(GOG_URL));
@@ -168,6 +184,7 @@ async function main() {
   });
 
   const status = await invoke("get_status");
+  installedVersion = status.installed_version;
   $("install-dir").textContent = status.install_dir;
   $("cdn").textContent = status.cdn;
   renderOwnership(status.owned);
