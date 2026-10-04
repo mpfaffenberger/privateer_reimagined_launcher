@@ -157,7 +157,16 @@ async function changeInstallDir() {
 }
 
 // Launcher self-update (#48): offered, never forced; the backend refuses it during a game install.
+// A launcher left open re-checks when the player comes back to it, at most hourly (#57).
+const LAUNCHER_RECHECK_MS = 60 * 60 * 1000;
+let lastLauncherCheck = 0;   // time of the last attempt, failed or not: offline mustn't retry per focus
+
+function launcherRecheckDue() {
+  return !busy && Date.now() - lastLauncherCheck >= LAUNCHER_RECHECK_MS;
+}
+
 async function checkLauncherUpdate() {
+  lastLauncherCheck = Date.now();
   const u = await invoke("check_launcher_update");
   if (!u) return;
   $("launcher-update-text").textContent = `Launcher ${u.version} is ready to install.`;
@@ -196,6 +205,11 @@ async function loadNews() {
 async function main() {
   loadNews().catch(() => {});             // never holds up the game controls
   checkLauncherUpdate().catch(() => {});  // offline: simply no offer
+  // The native window's focus event: in WebView2 the DOM's focus/visibilitychange don't fire
+  // when the player comes back to the window (checked on a real minimize + restore).
+  await listen("tauri://focus", () => {
+    if (launcherRecheckDue()) checkLauncherUpdate().catch(() => {});
+  });
   $("launcher-update").addEventListener("click", updateLauncher);
   await listen("launcher-progress", ({ payload: p }) => {
     $("launcher-update-progress").textContent = p.total

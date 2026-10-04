@@ -58,7 +58,8 @@ Produces `target\release\bundle\nsis\Privateer Reimagined_<version>_x64-setup.ex
 ## Release a new launcher (it updates itself, #48)
 
 Installed launchers (0.3.0 and later) read `https://cdn.privateer-reimagined.com/launcher/latest.json`
-at start, offer a newer version in a banner, and on **Update** download it, check its signature
+at start and again when the player comes back to the window (Tauri's `tauri://focus`; at most
+hourly, #57), offer a newer version in a banner, and on **Update** download it, check its signature
 against the key compiled into them, run the installer passively and restart.
 
 1. Bump the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `package.json`
