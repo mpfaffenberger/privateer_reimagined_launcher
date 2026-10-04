@@ -8,16 +8,21 @@
   <meta name="theme-color" content="#0f141b">
   <meta property="og:title" content="Privateer Reimagined">
   <meta property="og:description" content="Trade, fight and smuggle your way across the Gemini Sector.">
-  <meta property="og:image" content="https://privateer-reimagined.com/img/new-detroit-1536.webp">
+  <meta property="og:image" content="https://privateer-reimagined.com/video/new-detroit.webp">
   <link rel="preload" href="/fonts/archivo-expanded.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="hero">
-    <img class="hero-art" src="/img/new-detroit-1536.webp"
-         srcset="/img/new-detroit-960.webp 960w, /img/new-detroit-1536.webp 1536w" sizes="100vw"
-         alt="A rain-slick street in New Detroit at night: a bar under a red awning, stairs climbing into the city, a ship parked behind hangar glass."
-         width="1536" height="1024" fetchpriority="high">
+    <!-- Rendered from the game's own room animation (tools/room_loop.py); poster = frame 0. -->
+    <video class="hero-art" autoplay muted loop playsinline poster="/video/new-detroit.webp"
+           width="1536" height="1024" role="img"
+           aria-label="A rain-slick street in New Detroit at night: a bar under a red awning, people walking under the neon, a ship parked behind hangar glass.">
+      <source src="/video/new-detroit-960.webm" type="video/webm" media="(max-width: 900px)">
+      <source src="/video/new-detroit-960.mp4" type="video/mp4" media="(max-width: 900px)">
+      <source src="/video/new-detroit.webm" type="video/webm">
+      <source src="/video/new-detroit.mp4" type="video/mp4">
+    </video>
     <div class="hero-copy">
       <h1 class="lockup"><span>Privateer</span> <span>Reimagined</span></h1>
       <p class="tagline">Trade, fight and smuggle your way across the Gemini Sector. A from-scratch
@@ -55,6 +60,31 @@
       </figure>
     </section>
 
+    <section class="flight" aria-labelledby="flight-title">
+      <div class="intro">
+        <h2 id="flight-title">Out between the stars</h2>
+        <p>Fly the Tarsus, Galaxy, Orion and Centurion, rebuilt as new 3D ships, through systems
+          that each have their own sun and sky. These were captured in the game.</p>
+      </div>
+      <figure class="shot shot-wide">
+        <img src="/img/tarsus-penders-star-1600.webp"
+             srcset="/img/tarsus-penders-star-960.webp 960w, /img/tarsus-penders-star-1600.webp 1600w"
+             sizes="(min-width: 1280px) 1150px, 100vw" width="1600" height="960" loading="lazy"
+             alt="A Tarsus cruising past a blue-white star in a purple nebula, its engines glowing.">
+        <figcaption>A Tarsus off Pender's Star</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="/img/galaxy-new-detroit-800.webp" width="800" height="480" loading="lazy"
+             alt="A Galaxy freighter in profile, the city-lit planet New Detroit behind it.">
+        <figcaption>A Galaxy passing New Detroit</figcaption>
+      </figure>
+      <figure class="shot">
+        <img src="/img/centurion-crimson-veil-800.webp" width="800" height="480" loading="lazy"
+             alt="A Centurion seen from below against a rust-red sky, the top of a mining station glowing at the bottom edge.">
+        <figcaption>A Centurion under the red dwarf of Crimson Veil</figcaption>
+      </figure>
+    </section>
+
     <section class="story" aria-labelledby="story-title">
       <div class="story-copy">
         <h2 id="story-title">The story you remember, retold</h2>
@@ -69,10 +99,14 @@
         </figure>
       </div>
       <div class="cast">
-        <img src="/img/grayson-400.webp" width="400" height="500" loading="lazy"
-             alt="Portrait of a rugged pilot in a worn leather flight jacket.">
-        <img src="/img/vera-400.webp" width="400" height="500" loading="lazy"
-             alt="Portrait of a pilot with an eye patch and a headset, in a dark flight suit.">
+        <figure><img src="/img/grayson-400.webp" width="400" height="500" loading="lazy"
+             alt="Portrait of Grayson, a rugged pilot in a worn leather flight jacket."><figcaption>Grayson</figcaption></figure>
+        <figure><img src="/img/tayla-400.webp" width="400" height="500" loading="lazy"
+             alt="Portrait of Tayla, a red-haired pilot in a leather jacket."><figcaption>Tayla</figcaption></figure>
+        <figure><img src="/img/miggs-400.webp" width="400" height="500" loading="lazy"
+             alt="Portrait of Miggs, a heavyset bald man in a dark suit."><figcaption>Miggs</figcaption></figure>
+        <figure><img src="/img/lynch-400.webp" width="400" height="500" loading="lazy"
+             alt="Portrait of Lynch, a grey-haired man in a black suit."><figcaption>Lynch</figcaption></figure>
       </div>
     </section>
 

@@ -76,6 +76,13 @@ p { margin: 0.9em 0 0; }
   z-index: -2;
 }
 
+/* Reduced motion: no autoplaying loop. The poster (= the loop's first frame) is shown as a
+   background instead; it only downloads when this rule applies. */
+@media (prefers-reduced-motion: reduce) {
+  video.hero-art { display: none; }
+  .hero:not(.lost) { background: var(--night) url("/video/new-detroit.webp") 50% 40% / cover no-repeat; }
+}
+
 /* Scrim: dark only where the type sits (bottom-left), so the reflections on the wet floor,
    the stairs and the hangar glass keep their light. The last strip fades into the page. */
 .hero::after {
@@ -171,20 +178,30 @@ figcaption { font-size: 0.9rem; color: var(--stone); margin-top: 10px; }
       "main a"
       "main b";
   }
-  .intro { grid-area: intro; display: grid; grid-template-columns: 1.65fr 1fr; gap: 32px; align-items: end; }
+  .ports .intro { grid-area: intro; }
+  .intro { display: grid; grid-template-columns: 1.65fr 1fr; gap: 32px; align-items: end; }
   .intro p { margin: 0; }
   .port-main { grid-area: main; }
   .port-main img { height: 100%; object-fit: cover; }
   .port-main { display: grid; grid-template-rows: 1fr auto; }
 }
 
-/* Story: words and a bar scene on the left, two faces on the right, the second one
+/* In flight: one wide frame across the page, two beneath it. Unlike the ports gallery
+   (big + stacked), this one reads left to right like stills from a reel. */
+.flight { display: grid; gap: 28px 32px; grid-template-columns: 1fr; }
+@media (min-width: 700px) {
+  .flight { grid-template-columns: 1fr 1fr; }
+  .flight .intro, .shot-wide { grid-column: 1 / -1; }
+}
+
+/* Story: words and a bar scene on the left, the cast on the right, every other face
    dropped lower, like stills pinned to a board. */
 .story { display: grid; gap: 40px; }
 .story-copy p { max-width: var(--measure); }
 .bar { margin-top: 32px; }
-.cast { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-.cast img + img { margin-top: 18%; }
+.cast { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 16px; align-items: start; }
+.cast figure:nth-child(even) { margin-top: 18%; }
+.cast figcaption { font-family: var(--display); font-weight: 700; font-size: 0.95rem; color: var(--bone); }
 
 @media (min-width: 860px) {
   .story { grid-template-columns: 1.2fr 1fr; gap: 56px; align-items: start; }
