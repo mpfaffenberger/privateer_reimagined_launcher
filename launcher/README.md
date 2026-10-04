@@ -74,7 +74,10 @@ against the key compiled into them, run the installer passively and restart.
    `uv run prl upload-launcher --installer <exe> --version <v> --notes "<one line>" --to r2`.
    It uploads the installer and its `.sig` (immutable names), then points `latest.json` at them
    last. It refuses an unsigned installer and refuses to offer an older version than the feed has.
-4. Point the website's download button at the new installer.
+4. Point the website's download button at the new installer, **and** update the SHA-256 printed
+   under "Open it" and the version in the note. Then `python tools/check_site_download.py`
+   (and `--live` after the deploy): it downloads what the button links to and compares it with
+   the printed hash (#62).
 
 **The updater key** (`%USERPROFILE%\.prl\launcher_updater.key`; public half in
 `tauri.conf.json` `plugins.updater.pubkey`) is separate from the game's release key. Back it up
