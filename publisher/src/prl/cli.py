@@ -58,9 +58,11 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--pubkey", required=True, help="base64 ed25519 public key")
     v.add_argument("--deep", action="store_true", help="also download + hash every blob")
 
-    u = sub.add_parser("upload-launcher", help="publish the launcher installer (immutable name)")
-    u.add_argument("--installer", type=Path, required=True, help="the NSIS setup .exe")
+    u = sub.add_parser("upload-launcher",
+                       help="publish the launcher installer + signature, then point the update feed at it")
+    u.add_argument("--installer", type=Path, required=True, help="the NSIS setup .exe (its .sig beside it)")
     u.add_argument("--version", required=True, help="launcher version, e.g. 0.1.0")
+    u.add_argument("--notes", default="", help="release notes shown in the launcher's update prompt")
     u.add_argument("--to", required=True, help="'r2' or a local directory")
 
     f = sub.add_parser("upload-file", help="publish files under content-hashed names (e.g. site video)")
@@ -84,7 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         data = ci.download_manifest(a.run, a.repo) if a.run else a.manifest.read_bytes()
         release.sign_publish(data, open_store(a.to), a.key, dry_run=a.dry_run)
     elif a.cmd == "upload-launcher":
-        launcher_dist.upload_installer(open_store(a.to), a.installer, a.version)
+        launcher_dist.upload_installer(open_store(a.to), a.installer, a.version, a.notes)
     elif a.cmd == "upload-file":
         store = open_store(a.to)
         for path in a.files:

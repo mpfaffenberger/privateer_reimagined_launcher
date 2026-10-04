@@ -38,6 +38,7 @@ function render() {
   const primary = $("primary");
   $("verify").disabled = busy || !owned || !update || !update.installed_version;
   $("change-dir").disabled = busy;
+  $("launcher-update").disabled = busy;
   if (!owned) {
     primary.disabled = true;
     primary.textContent = "Privateer required";
@@ -155,6 +156,31 @@ async function changeInstallDir() {
   }
 }
 
+// Launcher self-update (#48): offered, never forced; the backend refuses it during a game install.
+async function checkLauncherUpdate() {
+  const u = await invoke("check_launcher_update");
+  if (!u) return;
+  $("launcher-update-text").textContent = `Launcher ${u.version} is ready to install.`;
+  $("launcher-update-notes").textContent = u.notes || "";
+  $("launcher-update-notes").hidden = !u.notes;
+  $("launcher-update-card").hidden = false;
+}
+
+async function updateLauncher() {
+  showError(null);
+  setBusy(true);
+  $("launcher-update").textContent = "Updating…";
+  $("launcher-update-progress").hidden = false;
+  try {
+    await invoke("install_launcher_update");   // on success the launcher restarts as the new version
+  } catch (e) {
+    $("launcher-update").textContent = "Update";
+    $("launcher-update-progress").hidden = true;
+    showError(`The launcher update failed: ${e}`);
+    setBusy(false);
+  }
+}
+
 // The news panel (#44): shown only if the site answers now; otherwise the built-in fallback.
 async function loadNews() {
   const url = await invoke("news_url");
@@ -168,7 +194,14 @@ async function loadNews() {
 }
 
 async function main() {
-  loadNews().catch(() => {});   // never holds up the game controls
+  loadNews().catch(() => {});             // never holds up the game controls
+  checkLauncherUpdate().catch(() => {});  // offline: simply no offer
+  $("launcher-update").addEventListener("click", updateLauncher);
+  await listen("launcher-progress", ({ payload: p }) => {
+    $("launcher-update-progress").textContent = p.total
+      ? `Downloading ${bytes(p.done)} of ${bytes(p.total)}`
+      : `Downloading ${bytes(p.done)}`;
+  });
   $("primary").addEventListener("click", primaryClicked);
   $("retry").addEventListener("click", () => checkUpdate());
   $("verify").addEventListener("click", verifyClicked);

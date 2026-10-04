@@ -81,6 +81,11 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
 .secondary { background: rgba(255, 255, 255, 0.04); border-color: var(--line); color: var(--text); }
 .link { background: none; color: var(--accent); padding: 0 4px; text-decoration: underline; }
 
+.banner { display: flex; align-items: center; gap: 12px; padding-block: 10px; }
+.banner > div { flex: 1; min-width: 0; }
+.banner p { margin: 0; }
+.banner p + p { margin-top: 2px; }
+
 details summary { cursor: pointer; }
 details p { margin: 4px 0 0; user-select: text; overflow-wrap: anywhere; }
 
