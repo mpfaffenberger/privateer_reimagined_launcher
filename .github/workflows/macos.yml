@@ -43,6 +43,15 @@ jobs:
           npm ci
           npx tauri build --bundles app,dmg --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
+      # An unsigned app with a broken or partial signature gets "is damaged and can't be
+      # opened" (no Open Anyway). Ad-hoc signing the whole bundle (signingIdentity "-") gives
+      # the milder "could not verify" instead. Fail here if the seal isn't complete.
+      - name: Check the app's ad-hoc signature covers the whole bundle
+        run: |
+          app="target/release/bundle/macos/Privateer Reimagined.app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -E 'Signature=adhoc|Sealed Resources'
+
       - name: Upload the .dmg
         uses: actions/upload-artifact@v4
         with:
