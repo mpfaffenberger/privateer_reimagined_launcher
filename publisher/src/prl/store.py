@@ -61,6 +61,16 @@ class LocalStore:
         return self._path(key)
 
 
+# Content types by extension. Without one, browsers get raw bytes (JSON) or may try to render
+# a download; .exe must arrive as a file to save.
+CONTENT_TYPES = {".json": "application/json", ".sig": "application/octet-stream",
+                 ".exe": "application/vnd.microsoft.portable-executable"}
+
+
+def content_type(key: str) -> str:
+    return CONTENT_TYPES.get(Path(key).suffix.lower(), "application/octet-stream")
+
+
 class R2Store:
     """Cloudflare R2 through its S3-compatible API. Credentials come from the environment
     (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET), never the repo."""
@@ -105,12 +115,14 @@ class R2Store:
     def put_bytes(self, key: str, data: bytes) -> None:
         # Manifests and pointers must not be served stale by the CDN after a publish.
         cache = "no-cache" if key.startswith(("channels/", "manifests/")) else "public, max-age=31536000, immutable"
-        self.s3.put_object(Bucket=self.bucket, Key=key, Body=data, CacheControl=cache)
+        self.s3.put_object(Bucket=self.bucket, Key=key, Body=data, CacheControl=cache,
+                           ContentType=content_type(key))
 
     def put_file(self, key: str, path: Path) -> None:
-        # Blobs are content-addressed, so they never change: cache them forever.
+        # Blobs are content-addressed and installers are versioned: neither ever changes.
         self.s3.upload_file(str(path), self.bucket, key,
-                            ExtraArgs={"CacheControl": "public, max-age=31536000, immutable"})
+                            ExtraArgs={"CacheControl": "public, max-age=31536000, immutable",
+                                       "ContentType": content_type(key)})
 
     def local_path(self, key: str) -> Path | None:
         return None
