@@ -108,6 +108,26 @@ async fn tampered_or_unsigned_releases_are_refused() {
 }
 
 #[tokio::test]
+async fn an_unpublished_channel_is_no_release_but_a_broken_store_is_an_error() {
+    // #66: before the first Mac release, `stable-macos` doesn't exist. That's "nothing yet",
+    // which the launcher must not blame on the network.
+    let store = TestStore::new();
+    store.publish("1.0.0", &[("game.exe", b"MZ")]);
+    let game = tempfile::tempdir().unwrap();
+    let inst = installer(&store, game.path());
+    match inst.check("stable-macos").await {
+        Err(Error::NoRelease(channel)) => assert_eq!(channel, "stable-macos"),
+        other => panic!("expected NoRelease, got {other:?}"),
+    }
+    // A pointer whose manifest is gone is a broken store, never "nothing published".
+    std::fs::remove_file(store.path("manifests/1.0.0.json")).unwrap();
+    match inst.check("stable").await {
+        Err(Error::NoRelease(_)) | Ok(_) => panic!("a missing manifest must stay an error"),
+        Err(_) => {}
+    }
+}
+
+#[tokio::test]
 async fn a_release_for_another_os_is_refused_and_the_install_is_untouched() {
     // #66: e.g. a Mac build published to Windows' channel by mistake.
     let store = TestStore::new();

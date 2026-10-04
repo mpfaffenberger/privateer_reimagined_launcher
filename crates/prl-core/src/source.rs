@@ -38,6 +38,9 @@ impl Source {
             Source::Http { client, base } => {
                 let resp = client.get(format!("{base}/{key}")).send().await
                     .map_err(|e| Error::Fetch(format!("{key}: {e}")))?;
+                if resp.status() == reqwest::StatusCode::NOT_FOUND {
+                    return Err(Error::NotFound(key.to_string()));
+                }
                 if !resp.status().is_success() {
                     return Err(Error::Fetch(format!("{key}: HTTP {}", resp.status())));
                 }
@@ -45,7 +48,10 @@ impl Source {
             }
             Source::Dir(root) => {
                 let p = Self::dir_path(root, key);
-                tokio::fs::read(&p).await.map_err(|e| Error::Fetch(format!("{}: {e}", p.display())))
+                tokio::fs::read(&p).await.map_err(|e| match e.kind() {
+                    std::io::ErrorKind::NotFound => Error::NotFound(key.to_string()),
+                    _ => Error::Fetch(format!("{}: {e}", p.display())),
+                })
             }
         }
     }

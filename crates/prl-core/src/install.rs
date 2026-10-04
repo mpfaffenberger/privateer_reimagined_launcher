@@ -179,7 +179,13 @@ impl Installer {
         if channel.is_empty() || !channel.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
             return Err(Error::Format(format!("bad channel name {channel:?}")));
         }
-        let pointer: ChannelPointer = serde_json::from_slice(&self.source.get(&format!("channels/{channel}.json")).await?)
+        // No pointer = nothing published on this channel (yet). Only here: a missing manifest or
+        // signature behind an existing pointer is a broken store and stays an error.
+        let pointer_bytes = match self.source.get(&format!("channels/{channel}.json")).await {
+            Err(Error::NotFound(_)) => return Err(Error::NoRelease(channel.to_string())),
+            other => other?,
+        };
+        let pointer: ChannelPointer = serde_json::from_slice(&pointer_bytes)
             .map_err(|e| Error::Format(format!("channel pointer: {e}")))?;
         let untrusted = |why: &str| Err(Error::Untrusted(why.to_string()));
         if pointer.format != FORMAT || pointer.channel != channel {

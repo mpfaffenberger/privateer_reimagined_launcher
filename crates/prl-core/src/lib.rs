@@ -17,6 +17,13 @@ pub mod vdf;
 pub enum Error {
     #[error("network or storage error: {0}")]
     Fetch(String),
+    /// The server answered, and the file isn't there (HTTP 404, or missing from a folder).
+    #[error("not on the server: {0}")]
+    NotFound(String),
+    /// Nothing has been published on this channel yet, e.g. no release for this OS (#66).
+    /// A normal state, not a fault: the launcher says so instead of blaming the network.
+    #[error("no release has been published on {0} yet")]
+    NoRelease(String),
     #[error("release check failed: {0}")]
     Untrusted(String),
     #[error("bad release data: {0}")]
