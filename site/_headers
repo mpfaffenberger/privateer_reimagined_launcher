@@ -1,7 +1,7 @@
 /*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
-  Referrer-Policy: strict-origin-when-cross-origin
+  Referrer-Policy: no-referrer
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Content-Security-Policy: default-src 'self'; img-src 'self' data:; media-src https://cdn.privateer-reimagined.com; style-src 'self'; script-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
@@ -14,6 +14,9 @@
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 
 /404.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/privacy/
   Cache-Control: public, max-age=0, must-revalidate, no-transform
 
 # The launcher's news panel (#42) is the one page that may be framed, and only by the

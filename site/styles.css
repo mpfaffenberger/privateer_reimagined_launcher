@@ -303,6 +303,17 @@ footer {
   font-size: 0.85rem;
 }
 footer p { margin: 0; max-width: 44rem; }
+footer p + p { margin-top: 8px; }
+
+/* Text pages (privacy, #61): one readable column. */
+.page { max-width: var(--measure); padding-block: clamp(48px, 9vw, 96px) 0; }
+.page h1 { font-family: var(--display); font-weight: 900; font-size: clamp(2.2rem, 6vw, 3.6rem);
+           line-height: 1; margin: 8px 0 20px; text-transform: uppercase; }
+.page h2 { font-size: 1.25rem; max-width: none; margin: 36px 0 8px; }
+.page p { margin: 0 0 12px; }
+.page .lede { font-size: 1.35rem; color: var(--bone); }
+.page .eyebrow a { color: var(--stone); text-decoration: none; }
+.page .updated { margin-top: 36px; color: var(--stone); font-size: 0.85rem; }
 
 /* 404 */
 .lost .hero-copy p { max-width: var(--measure); }
