@@ -18,10 +18,12 @@
     <video class="hero-art" autoplay muted loop playsinline poster="/video/new-detroit.webp"
            width="1536" height="1024" role="img"
            aria-label="A rain-slick street in New Detroit at night: a bar under a red awning, people walking under the neon, a ship parked behind hangar glass.">
-      <source src="/video/new-detroit-960.webm" type="video/webm" media="(max-width: 900px)">
-      <source src="/video/new-detroit-960.mp4" type="video/mp4" media="(max-width: 900px)">
-      <source src="/video/new-detroit.webm" type="video/webm">
-      <source src="/video/new-detroit.mp4" type="video/mp4">
+      <!-- Served from the CDN (R2): Safari needs byte-range (206) replies, which Workers static
+           assets don't give (#34). Content-hashed names: `prl upload-file --prefix site/video`. -->
+      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-960-fded641f00.webm" type="video/webm" media="(max-width: 900px)">
+      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-960-2244efcc53.mp4" type="video/mp4" media="(max-width: 900px)">
+      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-287827a160.webm" type="video/webm">
+      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-b988641257.mp4" type="video/mp4">
     </video>
     <div class="hero-copy">
       <h1 class="lockup"><span>Privateer</span> <span>Reimagined</span></h1>

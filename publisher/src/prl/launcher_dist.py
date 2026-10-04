@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import hashlib
 import re
 from pathlib import Path
 
+from .cdn_files import CDN, publish_immutable
 from .store import Store
 
-CDN = "https://cdn.privateer-reimagined.com"
 VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 
 
@@ -19,21 +18,14 @@ def installer_key(version: str) -> str:
 
 
 def upload_installer(store: Store, installer: Path, version: str, log=print) -> str:
-    """Upload `installer` as `version`; returns its SHA-256. Re-uploading identical bytes is a
-    no-op; different bytes under a published name are refused (links and hashes on the site
-    must never silently change)."""
+    """Upload `installer` as `version`; returns its SHA-256. The name is versioned rather than
+    content-hashed because the site links it by version; bump the version to change bytes."""
     key = installer_key(version)
     if version not in installer.name:
         raise ValueError(f"{installer.name} doesn't look like the {version} installer")
-    data = installer.read_bytes()
-    sha = hashlib.sha256(data).hexdigest()
-    if store.exists(key):
-        if hashlib.sha256(store.get(key)).hexdigest() != sha:
-            raise FileExistsError(f"{key} is already published with different contents; "
-                                  "bump the launcher version instead")
-        log(f"[launcher] {key} already published, identical")
-    else:
-        store.put_file(key, installer)
-        log(f"[launcher] uploaded {key} ({len(data) / 1e6:.2f} MB)")
+    try:
+        sha = publish_immutable(store, key, installer, log)
+    except FileExistsError as e:
+        raise FileExistsError(f"{e}; bump the launcher version") from None
     log(f"[launcher] {CDN}/{key}\n[launcher] sha256 {sha}")
     return sha

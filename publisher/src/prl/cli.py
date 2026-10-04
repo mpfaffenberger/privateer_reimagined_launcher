@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import ci, launcher_dist, release, sign
+from . import cdn_files, ci, launcher_dist, release, sign
 from .store import LocalStore, open_store
 
 # Where the release signing key lives on the publishing machine (docs/DESIGN.md).
@@ -63,6 +63,11 @@ def main(argv: list[str] | None = None) -> int:
     u.add_argument("--version", required=True, help="launcher version, e.g. 0.1.0")
     u.add_argument("--to", required=True, help="'r2' or a local directory")
 
+    f = sub.add_parser("upload-file", help="publish files under content-hashed names (e.g. site video)")
+    f.add_argument("files", type=Path, nargs="+")
+    f.add_argument("--prefix", required=True, help="key prefix, e.g. site/video")
+    f.add_argument("--to", required=True, help="'r2' or a local directory")
+
     a = ap.parse_args(argv)
     if a.cmd == "keygen":
         pub = sign.keygen(a.out)
@@ -80,6 +85,10 @@ def main(argv: list[str] | None = None) -> int:
         release.sign_publish(data, open_store(a.to), a.key, dry_run=a.dry_run)
     elif a.cmd == "upload-launcher":
         launcher_dist.upload_installer(open_store(a.to), a.installer, a.version)
+    elif a.cmd == "upload-file":
+        store = open_store(a.to)
+        for path in a.files:
+            cdn_files.upload_file(store, path, a.prefix)
     elif a.cmd == "verify":
         problems = release.verify(open_store(a.store), a.channel, a.pubkey, deep=a.deep)
         for msg in problems:
