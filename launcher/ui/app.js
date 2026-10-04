@@ -5,6 +5,7 @@ const { open } = window.__TAURI__.dialog;
 const { openUrl } = window.__TAURI__.opener;
 
 const GOG_URL = "https://www.gog.com/en/game/wing_commander_privateer";
+const PRIVACY_URL = "https://privateer-reimagined.com/privacy/";   // #61
 const $ = (id) => document.getElementById(id);
 const STORE_NAMES = { gog: "GOG", steam: "Steam", folder: "your folder" };
 
@@ -221,6 +222,7 @@ async function main() {
   $("verify").addEventListener("click", verifyClicked);
   $("browse-privateer").addEventListener("click", browsePrivateer);
   $("get-gog").addEventListener("click", () => openUrl(GOG_URL));
+  $("privacy").addEventListener("click", () => openUrl(PRIVACY_URL));
   $("change-dir").addEventListener("click", changeInstallDir);
   await listen("progress", ({ payload: p }) => {
     const pct = p.total_bytes ? Math.round((p.done_bytes / p.total_bytes) * 100) : 100;
@@ -233,7 +235,7 @@ async function main() {
   const status = await invoke("get_status");
   installedVersion = status.installed_version;
   $("install-dir").textContent = status.install_dir;
-  $("cdn").textContent = status.cdn;
+  $("footer").title = `Update store: ${status.cdn}`;   // for testers (PRL_CDN); players don't need it
   renderOwnership(status.owned);
   if (status.owned) await checkUpdate();
 }
