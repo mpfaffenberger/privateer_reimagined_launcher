@@ -80,7 +80,7 @@ p { margin: 0.9em 0 0; }
    background instead; it only downloads when this rule applies. */
 @media (prefers-reduced-motion: reduce) {
   video.hero-art { display: none; }
-  .hero:not(.lost) { background: var(--night) url("/video/new-detroit.webp") 50% 40% / cover no-repeat; }
+  .hero:not(.lost) { background: var(--night) url("/video/concourses.webp") 50% 40% / cover no-repeat; }
 }
 
 /* Scrim: dark only where the type sits (bottom-left), so the reflections on the wet floor,
@@ -91,8 +91,16 @@ p { margin: 0.9em 0 0; }
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(ellipse 70% 60% at 18% 88%, rgb(15 20 27 / 0.78) 0%, rgb(15 20 27 / 0) 70%),
+    radial-gradient(ellipse 85% 70% at 24% 90%, rgb(15 20 27 / 0.9) 0%, rgb(15 20 27 / 0.7) 45%, rgb(15 20 27 / 0) 78%),
     linear-gradient(to top, var(--night) 0%, rgb(15 20 27 / 0) 16%);
+}
+/* The reel's rooms vary a lot in brightness (the naval deck's floor is lit), so the scrim is
+   sized for the brightest. On narrow screens the copy spans the width: darken bottom-up. */
+@media (max-width: 700px) {
+  .hero::after {
+    background: linear-gradient(to top, var(--night) 0%, rgb(15 20 27 / 0.88) 35%,
+                                rgb(15 20 27 / 0.6) 55%, rgb(15 20 27 / 0) 75%);
+  }
 }
 
 .hero-copy {

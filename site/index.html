@@ -8,22 +8,23 @@
   <meta name="theme-color" content="#0f141b">
   <meta property="og:title" content="Privateer Reimagined">
   <meta property="og:description" content="Trade, fight and smuggle your way across the Gemini Sector.">
-  <meta property="og:image" content="https://privateer-reimagined.com/video/new-detroit.webp">
+  <meta property="og:image" content="https://privateer-reimagined.com/video/concourses.webp">
   <link rel="preload" href="/fonts/archivo-expanded.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="hero">
-    <!-- Rendered from the game's own room animation (tools/room_loop.py); poster = frame 0. -->
-    <video class="hero-art" autoplay muted loop playsinline poster="/video/new-detroit.webp"
+    <!-- Every base's concourse, animated by the game's own room data and crossfading into the
+         next (tools/concourse_reel.py); poster = frame 0. -->
+    <video class="hero-art" autoplay muted loop playsinline poster="/video/concourses.webp"
            width="1536" height="1024" role="img"
-           aria-label="A rain-slick street in New Detroit at night: a bar under a red awning, people walking under the neon, a ship parked behind hangar glass.">
+           aria-label="A slideshow of base concourses: a naval observation deck, a pirate tunnel, farm and refinery domes, Oxford by night, a mining hall, a neon pleasure dome and a shipyard.">
       <!-- Served from the CDN (R2): Safari needs byte-range (206) replies, which Workers static
            assets don't give (#34). Content-hashed names: `prl upload-file --prefix site/video`. -->
-      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-960-fded641f00.webm" type="video/webm" media="(max-width: 900px)">
-      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-960-2244efcc53.mp4" type="video/mp4" media="(max-width: 900px)">
-      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-287827a160.webm" type="video/webm">
-      <source src="https://cdn.privateer-reimagined.com/site/video/new-detroit-b988641257.mp4" type="video/mp4">
+      <source src="https://cdn.privateer-reimagined.com/site/video/concourses-960-127794257a.webm" type="video/webm" media="(max-width: 900px)">
+      <source src="https://cdn.privateer-reimagined.com/site/video/concourses-960-0ee95dd5c6.mp4" type="video/mp4" media="(max-width: 900px)">
+      <source src="https://cdn.privateer-reimagined.com/site/video/concourses-a704e9b34e.webm" type="video/webm">
+      <source src="https://cdn.privateer-reimagined.com/site/video/concourses-f42ccd1e50.mp4" type="video/mp4">
     </video>
     <div class="hero-copy">
       <h1 class="lockup"><span>Privateer</span> <span>Reimagined</span></h1>

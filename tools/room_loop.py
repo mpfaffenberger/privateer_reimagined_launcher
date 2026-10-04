@@ -148,18 +148,19 @@ def draw_layers(canvas: Image.Image, layers: list[Layer], frame_no: int, fps_out
         canvas.alpha_composite(sprite, (round(dx * sx), round(dy * sy)))
 
 
-def render(plate, fill, stars, layers, seconds: int, fps_out: int):
+def render(plate, fill, stars, layers, fps_out: int, frames: range, loop_seconds: int | None = None):
+    """Yield RGB frames `frames` (output-frame numbers). With `loop_seconds`, the sky blends
+    back to its start over the loop's last SKY_XFADE_S so the loop is seamless."""
     w, h = plate.size
     sky = SkyRenderer(fill, stars, w, h) if fill is not None else None
-    total = seconds * fps_out
-    for n in range(total):
+    for n in frames:
         t = n / fps_out
         if sky:
             rgb = sky.at(t)
-            fade_from = seconds - SKY_XFADE_S
+            fade_from = loop_seconds - SKY_XFADE_S if loop_seconds else math.inf
             if t > fade_from:                         # blend toward where the loop restarts
                 k = (t - fade_from) / SKY_XFADE_S
-                rgb = rgb * (1 - k) + sky.at(t - seconds) * k
+                rgb = rgb * (1 - k) + sky.at(t - loop_seconds) * k
             canvas = Image.fromarray((rgb * 255).astype(np.uint8)).convert("RGBA")
         else:
             canvas = Image.new("RGBA", (w, h), (0, 0, 0, 255))
@@ -169,30 +170,60 @@ def render(plate, fill, stars, layers, seconds: int, fps_out: int):
         yield canvas.convert("RGB")
 
 
-def encode(frames, out: Path, size: tuple[int, int], fps_out: int, ffmpeg: str):
-    """Stream frames once into two encoders: VP9 WebM and H.264 MP4 (for older Safari)."""
+# (name suffix, output width or None for native, VP9 CRF, H.264 CRF)
+FULL_SIZE = [("", None, 36, 25)]
+# x264 starves the last frames of a stream (nothing later references them), so a loop's final
+# frame pops against its keyframe at the wrap. Encode this many frames past the end (the loop's
+# start again), with no B-frames so decode order is display order, then stream-copy them off.
+X264_PAD = 24
+
+
+def encode(frames, out: Path, size: tuple[int, int], fps_out: int, ffmpeg: str, loop_frames: int,
+           variants=FULL_SIZE):
+    """Stream `loop_frames` frames once into a VP9 WebM and an H.264 MP4 (for older Safari) per
+    variant, each with one keyframe per loop: periodic keyframes pulse visibly at high CRF, and
+    a mid-loop one buys nothing for a video that only ever restarts at frame 0. The poster is
+    frame 0 at native size."""
     w, h = size
     common = [ffmpeg, "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
               "-s", f"{w}x{h}", "-r", str(fps_out), "-i", "-", "-an", "-pix_fmt", "yuv420p"]
-    procs = [
-        subprocess.Popen(common + ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "36", "-row-mt", "1",
-                                   "-deadline", "good", "-cpu-used", "2", str(out.with_suffix(".webm"))],
-                         stdin=subprocess.PIPE),
-        subprocess.Popen(common + ["-c:v", "libx264", "-crf", "25", "-preset", "slow",
-                                   "-movflags", "+faststart", str(out.with_suffix(".mp4"))],
-                         stdin=subprocess.PIPE),
-    ]
-    poster = None
-    for i, frame in enumerate(frames):
-        if i == 0:
-            poster = frame
+    vp9, x264, padded = [], [], []
+    for suffix, width, vp9_crf, x264_crf in variants:
+        scale = ["-vf", f"scale={width}:-2:flags=lanczos"] if width else []
+        base = out.with_name(out.name + suffix)
+        vp9.append(subprocess.Popen(
+            common + scale + ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", str(vp9_crf), "-g", str(loop_frames),
+                              "-row-mt", "1", "-deadline", "good", "-cpu-used", "2", str(base.with_suffix(".webm"))],
+            stdin=subprocess.PIPE))
+        tmp = base.with_name(base.name + ".padded.mp4")
+        padded.append((tmp, base.with_suffix(".mp4")))
+        x264.append(subprocess.Popen(
+            common + scale + ["-c:v", "libx264", "-crf", str(x264_crf), "-preset", "slow",
+                              "-g", str(loop_frames + X264_PAD), "-x264-params", "scenecut=0:bframes=0", str(tmp)],
+            stdin=subprocess.PIPE))
+    poster, head, count = None, [], 0
+    for frame in frames:
         data = frame.tobytes()
-        for p in procs:
+        if count == 0:
+            poster = frame
+        if count < X264_PAD:
+            head.append(data)
+        for p in vp9 + x264:
             p.stdin.write(data)
-    for p in procs:
+        count += 1
+    if count != loop_frames:
+        raise SystemExit(f"expected {loop_frames} frames, got {count}")
+    for data in head:                                 # x264 only: the loop's start again
+        for p in x264:
+            p.stdin.write(data)
+    for p in vp9 + x264:
         p.stdin.close()
         if p.wait():
             raise SystemExit("ffmpeg failed")
+    for tmp, final in padded:                         # cut the padding off, no re-encode
+        subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", str(tmp), "-c", "copy", "-frames:v",
+                        str(loop_frames), "-movflags", "+faststart", str(final)], check=True)
+        tmp.unlink()
     poster.save(out.with_suffix(".webp"), "WEBP", quality=74, method=6)   # = frame 0, no jump
 
 
@@ -214,13 +245,13 @@ def main() -> None:
     if a.stills:                                   # stream; keep only the frames asked for
         total = seconds * a.fps
         wanted = {k * total // a.stills: f"still{k}" for k in range(a.stills)} | {total - 1: "last"}
-        for n, frame in enumerate(render(plate, fill, stars, layers, seconds, a.fps)):
+        for n, frame in enumerate(render(plate, fill, stars, layers, a.fps, range(total), seconds)):
             if n in wanted:
                 frame.save(f"{a.out}-{wanted[n]}.png")
         return
     import imageio_ffmpeg
-    encode(render(plate, fill, stars, layers, seconds, a.fps), a.out, plate.size, a.fps,
-           imageio_ffmpeg.get_ffmpeg_exe())
+    encode(render(plate, fill, stars, layers, a.fps, range(seconds * a.fps), seconds), a.out, plate.size,
+           a.fps, imageio_ffmpeg.get_ffmpeg_exe(), seconds * a.fps)
     for ext in (".webm", ".mp4", ".webp"):
         p = a.out.with_suffix(ext)
         print(f"  {p.name:28s} {p.stat().st_size / 1024:8.0f} KB")
