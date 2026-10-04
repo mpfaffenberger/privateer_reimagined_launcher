@@ -140,7 +140,20 @@ async function changeInstallDir() {
   }
 }
 
+// The news panel (#44): shown only if the site answers now; otherwise the built-in fallback.
+async function loadNews() {
+  const url = await invoke("news_url");
+  if (!url) return;
+  const frame = $("news-frame");
+  frame.addEventListener("load", () => {
+    frame.hidden = false;
+    $("news-fallback").hidden = true;
+  }, { once: true });
+  frame.src = url;
+}
+
 async function main() {
+  loadNews().catch(() => {});   // never holds up the game controls
   $("primary").addEventListener("click", primaryClicked);
   $("verify").addEventListener("click", verifyClicked);
   $("browse-privateer").addEventListener("click", browsePrivateer);

@@ -8,6 +8,17 @@
 </head>
 <body>
   <div class="stars" aria-hidden="true"></div>
+  <div class="layout">
+  <!-- News from privateer-reimagined.com/launcher/ (#44). Sandboxed: no scripts, forms or top
+       navigation, and no access to the launcher. New-window links go to the system browser. -->
+  <aside class="news" aria-label="News">
+    <iframe id="news-frame" title="News from Privateer Reimagined" sandbox="allow-same-origin allow-popups"
+            referrerpolicy="no-referrer" hidden></iframe>
+    <div id="news-fallback" class="news-fallback">
+      <p class="eyebrow">Gemini Sector</p>
+      <p class="dim">News from the project shows here when you're online.</p>
+    </div>
+  </aside>
   <main>
     <header>
       <p class="eyebrow">Gemini Sector &middot; 2669</p>
@@ -39,5 +50,6 @@
 
     <footer class="dim small">A fan project, not affiliated with Electronic Arts. <span id="cdn"></span></footer>
   </main>
+  </div>
 </body>
 </html>
