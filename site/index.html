@@ -4,74 +4,144 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Privateer Reimagined</title>
-  <meta name="description" content="A fan-made reimagining of Wing Commander: Privateer: trade, fight and smuggle your way across the Gemini Sector.">
+  <meta name="description" content="A fan-made reimagining of Wing Commander: Privateer. Trade, fight and smuggle your way across the Gemini Sector.">
+  <meta name="theme-color" content="#0f141b">
+  <meta property="og:title" content="Privateer Reimagined">
+  <meta property="og:description" content="Trade, fight and smuggle your way across the Gemini Sector.">
+  <meta property="og:image" content="https://privateer-reimagined.com/img/new-detroit-1536.webp">
+  <link rel="preload" href="/fonts/archivo-expanded.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="stars" aria-hidden="true"></div>
-
   <header class="hero">
-    <p class="eyebrow">Gemini Sector &middot; 2669</p>
-    <h1>Privateer <span>Reimagined</span></h1>
-    <p class="tagline">Trade, fight and smuggle your way across the Gemini Sector in a
-      from-scratch reimagining of the 1993 classic.</p>
-
-    <div class="cta">
-      <span class="button button-disabled" aria-disabled="true">Download the launcher</span>
-      <p class="cta-note">Windows launcher coming soon. It installs the game, keeps it patched,
-        and only downloads what changed.</p>
+    <img class="hero-art" src="/img/new-detroit-1536.webp"
+         srcset="/img/new-detroit-960.webp 960w, /img/new-detroit-1536.webp 1536w" sizes="100vw"
+         alt="A rain-slick street in New Detroit at night: a bar under a red awning, stairs climbing into the city, a ship parked behind hangar glass."
+         width="1536" height="1024" fetchpriority="high">
+    <div class="hero-copy">
+      <h1 class="lockup"><span>Privateer</span> <span>Reimagined</span></h1>
+      <p class="tagline">Trade, fight and smuggle your way across the Gemini Sector. A from-scratch
+        reimagining of Origin's 1993 classic, free for anyone who owns the original.</p>
+      <div class="get">
+        <a class="button" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-Setup-0.1.0-x64.exe">Download for Windows</a>
+        <p class="get-note">Version 0.1.0 for Windows 10 and 11, 3 MB.
+          A Mac version is on the way. <a href="#install">What to expect when installing</a></p>
+      </div>
     </div>
   </header>
 
   <main>
-    <section class="cards">
-      <article>
-        <h2>The Gemini Sector, rebuilt</h2>
-        <p>Painted bases, living concourses, a 3D-rendered fleet and the original missions,
-          rebuilt on a modern engine.</p>
-      </article>
-      <article>
-        <h2>Small, safe updates</h2>
-        <p>Every release is a signed list of files. The launcher fetches only what changed,
-          verifies every byte, and can repair a broken install.</p>
-      </article>
-      <article>
-        <h2>Your saves stay yours</h2>
-        <p>Updates only touch the game's own files. Saves and settings are never overwritten.</p>
-      </article>
+    <section class="ports" aria-labelledby="ports-title">
+      <div class="intro">
+        <h2 id="ports-title">The Gemini Sector, repainted</h2>
+        <p>Every concourse, bar and trading floor has been repainted at modern resolution, so the
+          places you land between jumps feel lived in again.</p>
+      </div>
+      <figure class="port port-main">
+        <img src="/img/pirate-base-1200.webp" srcset="/img/pirate-base-720.webp 720w, /img/pirate-base-1200.webp 1200w"
+             sizes="(min-width: 860px) 62vw, 100vw" width="1200" height="800" loading="lazy"
+             alt="A pirate base tunnel carved through rock, lit by lamps along a metal walkway.">
+        <figcaption>A pirate base, cut into an asteroid</figcaption>
+      </figure>
+      <figure class="port">
+        <img src="/img/navy-deck-720.webp" width="720" height="480" loading="lazy"
+             alt="A naval base concourse with a tall window onto open space.">
+        <figcaption>The navy's observation deck</figcaption>
+      </figure>
+      <figure class="port">
+        <img src="/img/oxford-library-720.webp" width="720" height="480" loading="lazy"
+             alt="A vaulted library at Oxford, shelves rising into the dark under a stained-glass window.">
+        <figcaption>Oxford's library</figcaption>
+      </figure>
     </section>
 
-    <section class="requirements">
-      <h2>Requirements</h2>
-      <ul>
-        <li><strong>A copy of <em>Wing Commander: Privateer</em></strong> on GOG or Steam.
-          The launcher checks for it before installing.</li>
-        <li>Windows 10 or 11, 64-bit</li>
-        <li>About 4 GB of disk space</li>
-      </ul>
+    <section class="story" aria-labelledby="story-title">
+      <div class="story-copy">
+        <h2 id="story-title">The story you remember, retold</h2>
+        <p>The original campaign is back, with new cinematics and a cast you can actually see. Haul
+          cargo, take mercenary contracts, hunt bounties, or follow the trail of a strange alien
+          artifact. The bars are busy again, and someone always has a job for you.</p>
+        <figure class="bar">
+          <img src="/img/mining-bar-1200.webp" srcset="/img/mining-bar-720.webp 720w, /img/mining-bar-1200.webp 1200w"
+               sizes="(min-width: 860px) 40vw, 100vw" width="1200" height="800" loading="lazy"
+               alt="Patrons drinking in a mining base bar, a bartender leaning on the counter.">
+          <figcaption>A mining base bar</figcaption>
+        </figure>
+      </div>
+      <div class="cast">
+        <img src="/img/grayson-400.webp" width="400" height="500" loading="lazy"
+             alt="Portrait of a rugged pilot in a worn leather flight jacket.">
+        <img src="/img/vera-400.webp" width="400" height="500" loading="lazy"
+             alt="Portrait of a pilot with an eye patch and a headset, in a dark flight suit.">
+      </div>
     </section>
 
-    <section class="faq">
-      <h2>FAQ</h2>
+    <section class="install" id="install" aria-labelledby="install-title">
+      <h2 id="install-title">Install in four steps</h2>
+      <ol class="steps">
+        <li>
+          <h3>Download the launcher</h3>
+          <p>It's a 3 MB installer. It doesn't need administrator rights.</p>
+        </li>
+        <li class="heads-up">
+          <h3>Open it</h3>
+          <p>Windows may show "Windows protected your PC", because the launcher isn't code-signed
+            yet. Choose <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+          <p class="hash">To check your download, its SHA-256 is
+            <code>cf48a4fdbc68b8ca5ff56567b28e2bd5a15af522e9c00da14dca6dd14f1785e4</code></p>
+        </li>
+        <li>
+          <h3>Show it your Privateer</h3>
+          <p>The launcher finds GOG and Steam copies of Wing Commander: Privateer on its own. If it
+            can't, point it at the folder.</p>
+        </li>
+        <li>
+          <h3>Install and play</h3>
+          <p>The first install downloads about 3.4 GB. After that, updates fetch only the files that
+            changed, check every byte, and never touch your saves.</p>
+        </li>
+      </ol>
+      <aside class="needs" aria-labelledby="needs-title">
+        <h3 id="needs-title">You'll need</h3>
+        <ul>
+          <li><em>Wing Commander: Privateer</em> on GOG or Steam</li>
+          <li>Windows 10 or 11, 64-bit</li>
+          <li>About 4 GB of free space</li>
+        </ul>
+        <p>Playing on a Mac? A Mac version is being built now.</p>
+      </aside>
+    </section>
+
+    <section class="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">Questions</h2>
       <details>
         <summary>Why do I need the original game?</summary>
-        <p>Privateer Reimagined builds on Origin's 1993 game, including its music and voices.
-          Owning the original is how we respect that. Pick it up on GOG if you don't have it.</p>
+        <p>Privateer Reimagined builds on Origin's 1993 game, including its music and voices. Owning
+          the original is how we respect that. It's on GOG and Steam if you don't have it.</p>
       </details>
       <details>
         <summary>How big are updates?</summary>
-        <p>Only changed files are downloaded, usually a fraction of the full install.</p>
+        <p>Usually a few megabytes. Each release is a signed list of files, and the launcher only
+          downloads the ones that changed. It can also repair a damaged install.</p>
+      </details>
+      <details>
+        <summary>Is the launcher safe to run?</summary>
+        <p>Every file the launcher installs is checked against a list signed by the project, so it
+          won't install anything that was tampered with on the way. The installer itself isn't
+          code-signed yet, which is why Windows warns you. Compare its SHA-256 above if you'd like
+          to check it.</p>
       </details>
       <details>
         <summary>Is this an official EA or Origin product?</summary>
         <p>No. It's a non-commercial fan project and isn't affiliated with or endorsed by
-          Electronic Arts. Wing Commander and Privateer are trademarks of their owners.</p>
+          Electronic Arts.</p>
       </details>
     </section>
   </main>
 
   <footer>
-    <p>Privateer Reimagined &middot; a fan project &middot; not affiliated with Electronic Arts</p>
+    <p>Privateer Reimagined is a non-commercial fan project. Wing Commander and Privateer are
+      trademarks of Electronic Arts, which isn't affiliated with this project.</p>
   </footer>
 </body>
 </html>
