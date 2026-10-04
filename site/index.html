@@ -17,7 +17,7 @@
     <!-- Every base's concourse, animated by the game's own room data and crossfading into the
          next (tools/concourse_reel.py); poster = frame 0. -->
     <video class="hero-art" autoplay muted loop playsinline poster="/video/concourses.webp"
-           width="1536" height="1024" role="img"
+           width="1536" height="1024" role="img" tabindex="-1"
            aria-label="A slideshow of base concourses: a naval observation deck, a pirate tunnel, farm and refinery domes, Oxford by night, a mining hall, a neon pleasure dome and a shipyard.">
       <!-- Served from the CDN (R2): Safari needs byte-range (206) replies, which Workers static
            assets don't give (#34). Content-hashed names: `prl upload-file --prefix site/video`. -->
@@ -26,6 +26,8 @@
       <source src="https://cdn.privateer-reimagined.com/site/video/concourses-a704e9b34e.webm" type="video/webm">
       <source src="https://cdn.privateer-reimagined.com/site/video/concourses-f42ccd1e50.mp4" type="video/mp4">
     </video>
+    <input type="checkbox" id="motion" class="motion-toggle">
+    <label for="motion" class="motion-label"><span class="motion-stop">Stop animation</span><span class="motion-play">Play animation</span></label>
     <div class="hero-copy">
       <h1 class="lockup"><span>Privateer</span> <span>Reimagined</span></h1>
       <p class="tagline">Trade, fight and smuggle your way across the Gemini Sector. A from-scratch

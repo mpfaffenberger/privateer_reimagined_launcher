@@ -76,12 +76,32 @@ p { margin: 0.9em 0 0; }
   z-index: -2;
 }
 
-/* Reduced motion: no autoplaying loop. The poster (= the loop's first frame) is shown as a
-   background instead; it only downloads when this rule applies. */
-@media (prefers-reduced-motion: reduce) {
-  video.hero-art { display: none; }
-  .hero:not(.lost) { background: var(--night) url("/video/concourses.webp") 50% 40% / cover no-repeat; }
+/* The reel plays for everyone (#49: it's gentle, crossfades and walkers, and Mike wants it
+   seen); anyone can stop it. No JS on the site, so the stop control is a checkbox + label:
+   checked hides the video and shows the poster (= the reel's first frame) instead. The poster
+   only downloads when the box is ticked. */
+.motion-toggle { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.motion-label {
+  position: absolute;
+  top: 16px;
+  right: var(--gutter);
+  z-index: 1;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgb(15 20 27 / 0.72);
+  color: var(--bone);
+  font: 700 0.72rem/1 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
 }
+.motion-label:hover { background: rgb(15 20 27 / 0.9); }
+.motion-toggle:focus-visible + .motion-label { outline: 2px solid var(--hangar); outline-offset: 2px; }
+.motion-play,
+.motion-toggle:checked + .motion-label .motion-stop { display: none; }
+.motion-toggle:checked + .motion-label .motion-play { display: inline; }
+.hero:has(.motion-toggle:checked) video.hero-art { display: none; }
+.hero:has(.motion-toggle:checked) { background: var(--night) url("/video/concourses.webp") 50% 40% / cover no-repeat; }
 
 /* Scrim: dark only where the type sits (bottom-left), so the reflections on the wet floor,
    the stairs and the hangar glass keep their light. The last strip fades into the page. */
