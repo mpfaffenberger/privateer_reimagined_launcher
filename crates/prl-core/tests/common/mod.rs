@@ -37,9 +37,15 @@ impl TestStore {
         std::fs::write(p, data).unwrap();
     }
 
-    /// Publish `files` as `version` on `stable`. Names ending in `.raw` are stored raw,
-    /// everything else zstd, to exercise both encodings.
+    /// Publish `files` as `version` on `stable`, launchable on every OS (so the tests run the
+    /// same on Windows and the macOS CI). Names ending in `.raw` are stored raw, everything
+    /// else zstd, to exercise both encodings.
     pub fn publish(&self, version: &str, files: &[(&str, &[u8])]) -> Vec<u8> {
+        self.publish_for(version, files, &["windows", "macos", "linux"])
+    }
+
+    /// Like `publish`, with a launch entry only for the given OSes (#66).
+    pub fn publish_for(&self, version: &str, files: &[(&str, &[u8])], oses: &[&str]) -> Vec<u8> {
         let mut entries = Vec::new();
         for (path, data) in files {
             let sha = hex::encode(Sha256::digest(data));
@@ -57,7 +63,7 @@ impl TestStore {
         let manifest = Manifest {
             format: 1, product: "privateer-reimagined".into(), version: version.into(),
             channel: "stable".into(), created_utc: "2026-10-03T00:00:00Z".into(),
-            launch: [("windows".to_string(), "game.exe".to_string())].into_iter().collect(),
+            launch: oses.iter().map(|os| (os.to_string(), "game.exe".to_string())).collect(),
             total_size: entries.iter().map(|e| e.size).sum(), files: entries,
         };
         let bytes = serde_json::to_vec_pretty(&manifest).unwrap();

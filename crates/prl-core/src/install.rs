@@ -199,6 +199,11 @@ impl Installer {
         if manifest.channel != channel || manifest.version != pointer.version {
             return untrusted("manifest channel/version disagree with the pointer");
         }
+        // A release built for another OS (published to the wrong channel by mistake) would
+        // replace a working install with files this computer can't run: refuse it (#66).
+        if manifest.launch_target().is_none() {
+            return Err(Error::Format(format!("release {} isn't built for {}", manifest.version, format::OS)));
+        }
         Ok(Release { pointer, manifest, manifest_bytes: bytes })
     }
 
