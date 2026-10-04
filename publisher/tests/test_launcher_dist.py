@@ -11,7 +11,7 @@ import pytest
 
 from conftest import quiet
 from prl import cli, launcher_dist
-from prl.store import LocalStore, content_type
+from prl.store import LocalStore, cache_control, content_type
 
 
 def installer(tmp_path, version="0.1.0", data=b"MZ fake installer", sig="dW50cnVzdGVkIGNvbW1lbnQ6IHNpZw=="):
@@ -99,6 +99,15 @@ def test_the_feed_never_rolls_back(tmp_path):
     assert store.writes == [] and launcher_dist.feed_version(store) == "0.10.0"
     launcher_dist.upload_installer(store, installer(tmp_path, "0.10.0"), "0.10.0", "fixed notes", log=quiet)
     assert json.loads(store.get("launcher/latest.json"))["notes"] == "fixed notes"   # same version: re-point ok
+
+
+def test_cache_headers():
+    # #54: the feed changes every release; a cached copy would pin launchers to an old version.
+    assert cache_control(launcher_dist.FEED_KEY) == "no-cache"
+    assert cache_control("channels/stable.json") == cache_control("manifests/1.0.0.json") == "no-cache"
+    immutable = "public, max-age=31536000, immutable"
+    key = launcher_dist.installer_key("0.3.0")
+    assert cache_control(key) == cache_control(key + ".sig") == cache_control("blobs/ab/abcdef.zst") == immutable
 
 
 def test_content_types():

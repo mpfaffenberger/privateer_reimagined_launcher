@@ -72,6 +72,16 @@ def content_type(key: str) -> str:
     return CONTENT_TYPES.get(Path(key).suffix.lower(), "application/octet-stream")
 
 
+# Keys that change in place: game channel pointers and manifests, and the launcher's update
+# feed (#54). Everything else (blobs, versioned installers + .sig, hashed site files) never
+# changes, so caches may keep it forever.
+MUTABLE = ("channels/", "manifests/", "launcher/latest.json")
+
+
+def cache_control(key: str) -> str:
+    return "no-cache" if key.startswith(MUTABLE) else "public, max-age=31536000, immutable"
+
+
 class R2Store:
     """Cloudflare R2 through its S3-compatible API. Credentials come from the environment
     (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET), never the repo."""
@@ -114,16 +124,12 @@ class R2Store:
         return self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read()
 
     def put_bytes(self, key: str, data: bytes) -> None:
-        # Manifests and pointers must not be served stale by the CDN after a publish.
-        cache = "no-cache" if key.startswith(("channels/", "manifests/")) else "public, max-age=31536000, immutable"
-        self.s3.put_object(Bucket=self.bucket, Key=key, Body=data, CacheControl=cache,
+        self.s3.put_object(Bucket=self.bucket, Key=key, Body=data, CacheControl=cache_control(key),
                            ContentType=content_type(key))
 
     def put_file(self, key: str, path: Path) -> None:
-        # Blobs are content-addressed and installers are versioned: neither ever changes.
         self.s3.upload_file(str(path), self.bucket, key,
-                            ExtraArgs={"CacheControl": "public, max-age=31536000, immutable",
-                                       "ContentType": content_type(key)})
+                            ExtraArgs={"CacheControl": cache_control(key), "ContentType": content_type(key)})
 
     def local_path(self, key: str) -> Path | None:
         return None
