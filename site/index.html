@@ -33,9 +33,10 @@
       <p class="tagline">Trade, fight and smuggle your way across the Gemini Sector. A from-scratch
         reimagining of Origin's 1993 classic, free for anyone who owns the original.</p>
       <div class="get">
-        <a class="button" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-Setup-0.3.0-x64.exe">Download for Windows</a>
-        <p class="get-note">Version 0.3.0 for Windows 10 and 11, 3 MB.
-          A Mac version is on the way. <a href="#install">What to expect when installing</a></p>
+        <a class="button" data-platform="windows" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-Setup-0.3.2-x64.exe">Download for Windows</a>
+        <a class="button" data-platform="mac" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-0.3.2-macos-arm64.dmg">Download for Mac</a>
+        <p class="get-note">Version 0.3.2 for Windows 10 and 11, and for Macs with Apple silicon.
+          <a href="#install">What to expect when installing</a></p>
       </div>
     </div>
   </header>
@@ -146,14 +147,20 @@
       <ol class="steps">
         <li>
           <h3>Download the launcher</h3>
-          <p>It's a 3 MB installer. It doesn't need administrator rights.</p>
+          <p>It's a 3 to 4 MB download. It doesn't need administrator rights.</p>
         </li>
         <li class="heads-up">
           <h3>Open it</h3>
-          <p>Windows may show "Windows protected your PC", because the launcher isn't code-signed
-            yet. Choose <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+          <p><strong>Windows</strong> may show "Windows protected your PC", because the launcher
+            isn't code-signed yet. Choose <strong>More info</strong>, then <strong>Run anyway</strong>.</p>
+          <p><strong>Mac:</strong> open the disk image and drag Privateer Reimagined into Applications.
+            The first time you open it, macOS says it can't verify the app, because it isn't
+            notarized by Apple yet. Click <strong>Done</strong>, open <strong>System Settings</strong>,
+            go to <strong>Privacy &amp; Security</strong>, scroll down and click <strong>Open
+            Anyway</strong>, then confirm. You only do this once; updates install themselves.</p>
           <p class="hash">To check your download, its SHA-256 is
-            <code>a203ec06ae143563325518a68e04df7b478e163975834eadf3f5511ce35368d6</code></p>
+            <span>for Windows: <code data-platform="windows">43bb31bff15d780dc3ba89886ac303a5b6dded0cef8fd31af30d9e3631644f31</code></span>
+            <span>for Mac: <code data-platform="mac">5ee44d12f2b793963b890a3eab3dc7db599d071dda74d064df19238238ed1407</code></span></p>
         </li>
         <li>
           <h3>Show it your Privateer</h3>
@@ -170,10 +177,9 @@
         <h3 id="needs-title">You'll need</h3>
         <ul>
           <li><em>Wing Commander: Privateer</em> on GOG or Steam</li>
-          <li>Windows 10 or 11, 64-bit</li>
+          <li>Windows 10 or 11, 64-bit, or a Mac with Apple silicon</li>
           <li>About 4 GB of free space</li>
         </ul>
-        <p>Playing on a Mac? A Mac version is being built now.</p>
       </aside>
     </section>
 
@@ -192,9 +198,9 @@
       <details>
         <summary>Is the launcher safe to run?</summary>
         <p>Every file the launcher installs is checked against a list signed by the project, so it
-          won't install anything that was tampered with on the way. The installer itself isn't
-          code-signed yet, which is why Windows warns you. Compare its SHA-256 above if you'd like
-          to check it.</p>
+          won't install anything that was tampered with on the way. The launcher itself isn't
+          code-signed by Microsoft or notarized by Apple yet, which is why Windows and macOS warn
+          you the first time. Compare its SHA-256 above if you'd like to check it.</p>
       </details>
       <details>
         <summary>Is this an official EA or Origin product?</summary>

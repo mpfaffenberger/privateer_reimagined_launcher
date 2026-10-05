@@ -1,8 +1,9 @@
-"""Check the website's download button against the SHA-256 it prints (#62).
+"""Check the website's download buttons against the SHA-256s it prints (#62, #69).
 
-Downloads whatever the button links to and compares it with the hash in the page's
-"To check your download" line, so the two can't drift apart when the button moves to a new
-launcher version. Run it after pointing the button at a new installer:
+Each button and its hash carry the same data-platform (windows, mac). For every platform this
+downloads what the button links to and compares it with the printed hash, so they can't drift
+apart when a button moves to a new launcher version. Run it after pointing the buttons at new
+files:
 
     python tools/check_site_download.py            # site/index.html in this checkout
     python tools/check_site_download.py --live     # https://privateer-reimagined.com/
@@ -18,8 +19,9 @@ from pathlib import Path
 
 LIVE = "https://privateer-reimagined.com/"
 PAGE = Path(__file__).resolve().parent.parent / "site" / "index.html"
-BUTTON = re.compile(r'href="(https://cdn\.privateer-reimagined\.com/launcher/PrivateerReimagined-Setup-([0-9.]+)-x64\.exe)"')
-HASH = re.compile(r'class="hash"[^<]*<code>([0-9a-f]{64})</code>')
+BUTTON = re.compile(r'<a class="button" data-platform="(\w+)" href="(https://cdn\.privateer-reimagined\.com/launcher/'
+                    r'PrivateerReimagined-(?:Setup-)?([0-9.]+)-[\w.-]+)">')
+HASH = re.compile(r'<code data-platform="(\w+)">([^<]*)</code>')
 
 
 def fetch(url: str) -> bytes:
@@ -29,18 +31,22 @@ def fetch(url: str) -> bytes:
 
 def main(argv: list[str]) -> int:
     html = fetch(f"{LIVE}?check").decode() if "--live" in argv else PAGE.read_text(encoding="utf-8")
-    buttons = set(BUTTON.findall(html))
-    hashes = set(HASH.findall(html))
-    if len(buttons) != 1 or len(hashes) != 1:
-        print(f"expected one installer link and one hash, found {len(buttons)} and {len(hashes)}")
+    buttons = {p: (url, v) for p, url, v in BUTTON.findall(html)}
+    hashes = dict(HASH.findall(html))
+    if not buttons or set(buttons) != set(hashes):
+        print(f"each download button needs a printed hash: buttons {sorted(buttons)}, hashes {sorted(hashes)}")
         return 1
-    (url, version), (printed,) = buttons.pop(), hashes
-    if f"Version {version} " not in html:
-        print(f"the note under the button doesn't say 'Version {version}'")
+    versions = {v for _, v in buttons.values()}
+    if len(versions) != 1 or f"Version {versions.pop()} " not in html:
+        print(f"the buttons and the 'Version ...' note disagree: {buttons}")
         return 1
-    actual = hashlib.sha256(fetch(url)).hexdigest()
-    ok = actual == printed
-    print(f"{'OK' if ok else 'MISMATCH'}: {version} -> {url}\n  page   {printed}\n  actual {actual}")
+    ok = True
+    for platform, (url, version) in sorted(buttons.items()):
+        printed = hashes[platform]
+        actual = hashlib.sha256(fetch(url)).hexdigest()
+        good = printed == actual
+        ok &= good
+        print(f"{'OK' if good else 'MISMATCH'}: {platform} {version} -> {url}\n  page   {printed}\n  actual {actual}")
     return 0 if ok else 1
 
 

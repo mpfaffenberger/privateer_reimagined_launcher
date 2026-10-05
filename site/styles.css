@@ -263,6 +263,7 @@ figcaption { font-size: 0.9rem; color: var(--stone); margin-top: 10px; }
 
 .heads-up p:first-of-type { border-left: 3px solid var(--awning); padding-left: 14px; }
 .hash { font-size: 0.9rem; color: var(--stone); }
+.hash span { display: block; margin-top: 8px; }   /* one line per platform (#69) */
 .hash code {
   display: block;
   margin-top: 4px;
