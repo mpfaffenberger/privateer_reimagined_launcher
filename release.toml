@@ -1,13 +1,22 @@
 # What a Privateer Reimagined release contains. See publisher/README.md.
-#   set GAME_REPO=C:\Users\mpfaffenberger\code\new_privateer   (after building new_privateer.exe)
+#   set GAME_REPO=C:\Users\mpfaffenberger\code\new_privateer   (after building the game)
+# One file for every OS (#66): `prl build --os macos --channel stable-macos` takes the
+# sources marked macos plus the unmarked ones; the default is a Windows build on `stable`.
 product = "privateer-reimagined"
 
 [launch]
 windows = "new_privateer.exe"
+macos = "new_privateer"
 
 [[source]]
+os = "windows"
 from = "${GAME_REPO}/build/new_privateer.exe"
 to = "new_privateer.exe"
+
+[[source]]
+os = "macos"
+from = "${GAME_REPO}/build/new_privateer"
+to = "new_privateer"
 
 [[source]]
 from = "${GAME_REPO}/assets"

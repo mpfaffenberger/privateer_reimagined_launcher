@@ -16,6 +16,10 @@
 
 Relative `from` paths resolve against the config file's folder; ${VARS} come from the
 environment, and an unset one is an error rather than a silently wrong path.
+
+One file describes every OS (#66). A source with `os = "macos"` (or windows, linux) is only
+in that OS's release; one without `os` is in all of them. `[launch]` has an entry per OS, and
+a release keeps only its own.
 """
 
 from __future__ import annotations
@@ -29,11 +33,33 @@ from pathlib import Path
 from . import paths
 
 
+OSES = ("windows", "macos", "linux")   # as prl-core's format::OS names them
+
+
 @dataclass
 class Source:
     src: Path
     dest: str
     exclude: list[str] = field(default_factory=list)
+
+
+def check_os(os_name: str) -> str:
+    if os_name not in OSES:
+        raise ValueError(f"unknown OS {os_name!r}; expected one of {', '.join(OSES)}")
+    return os_name
+
+
+def check_channel_for_os(channel: str, os_name: str) -> str:
+    """Mirror of prl-core's platform_channel: Windows launchers read the bare channel
+    (`stable`), others read `<channel>-<os>`. Publishing an OS's build anywhere else would
+    offer it to launchers on the wrong OS, which would replace a working install."""
+    check_os(os_name)
+    os_suffix = next((o for o in OSES if channel.endswith(f"-{o}")), None)
+    expected = "windows" if os_suffix is None else os_suffix
+    if expected != os_name:
+        want = "a channel without an OS suffix" if os_name == "windows" else f"a channel ending in -{os_name}"
+        raise ValueError(f"a {os_name} build must go to {want}, not {channel!r}")
+    return channel
 
 
 @dataclass
@@ -67,17 +93,27 @@ def _expand(value: str) -> str:
     return expanded
 
 
-def load(path: Path) -> ReleaseConfig:
+def load(path: Path, os_name: str = "windows") -> ReleaseConfig:
+    """The release for one OS: its sources and its launch entry only."""
+    check_os(os_name)
     doc = tomllib.loads(Path(path).read_text(encoding="utf-8"))
     base = Path(path).resolve().parent
     sources = []
     for s in doc.get("source", []):
+        if "os" in s and check_os(s["os"]) != os_name:
+            continue
+        # Expand only what this OS ships: the other OS's build output needn't exist here.
         src = Path(_expand(s["from"]))
         sources.append(Source(src if src.is_absolute() else base / src,
                               paths.check(s["to"]), list(s.get("exclude", []))))
     if not sources:
-        raise ValueError(f"{path}: no [[source]] entries")
-    return ReleaseConfig(doc["product"], dict(doc.get("launch", {})), sources)
+        raise ValueError(f"{path}: no [[source]] entries for {os_name}")
+    launch = dict(doc.get("launch", {}))
+    for name in launch:
+        check_os(name)
+    if os_name not in launch:
+        raise ValueError(f"{path}: [launch] has no {os_name} entry")
+    return ReleaseConfig(doc["product"], {os_name: paths.check(launch[os_name])}, sources)
 
 
 def collect(cfg: ReleaseConfig) -> list[tuple[Path, str]]:

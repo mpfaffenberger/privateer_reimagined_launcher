@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import cdn_files, ci, launcher_dist, release, sign
+from . import cdn_files, ci, config, launcher_dist, release, sign
 from .store import LocalStore, open_store
 
 # Where the release signing key lives on the publishing machine (docs/DESIGN.md).
@@ -24,6 +24,8 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--config", type=Path, required=True)
     b.add_argument("--version", required=True)
     b.add_argument("--channel", default="stable")
+    b.add_argument("--os", dest="os_name", default="windows", choices=config.OSES,
+                   help="which OS the release is for; non-Windows channels end in -<os> (e.g. stable-macos)")
     b.add_argument("--store", type=Path, default=Path("dist/store"))
     signing = b.add_mutually_exclusive_group()
     signing.add_argument("--key", type=Path, default=DEFAULT_KEY)
@@ -79,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         release.build(a.config, a.version, a.channel, LocalStore(a.store),
                       None if a.unsigned else a.key, level=a.level,
                       known=open_store(a.known_store) if a.known_store else None,
-                      lfs_pointers=a.lfs_pointers)
+                      lfs_pointers=a.lfs_pointers, os_name=a.os_name)
     elif a.cmd == "publish":
         release.publish(LocalStore(a.src), open_store(a.to), a.version, blobs_only=a.blobs_only)
     elif a.cmd == "sign-publish":

@@ -83,15 +83,19 @@ def store_blob(store: LocalStore, src: Path, sha: str, size: int, level: int) ->
 def build(config_path: Path, version: str, channel: str, store: LocalStore, key_path: Path | None,
           created_utc: str | None = None, workers: int = 8, level: int = 10,
           known: Store | None = None, lfs_pointers: bool = False, pull=lfs.pull,
-          log=print) -> Manifest:
+          os_name: str = "windows", log=print) -> Manifest:
     """Build `version` into `store`.
 
     known:        a destination (e.g. R2) whose existing blobs count as already built.
     lfs_pointers: accept LFS pointer stubs; pull only content nobody has yet.
     key_path:     None -> unsigned manifest, for `sign_publish` elsewhere.
+    os_name:      which OS this release is for; its channel must match (#66).
     """
-    cfg = config.load(config_path)
+    config.check_channel_for_os(channel, os_name)
+    cfg = config.load(config_path, os_name)
     files = config.collect(cfg)
+    if cfg.launch[os_name] not in {dest for _, dest in files}:
+        raise ValueError(f"the {os_name} launch target {cfg.launch[os_name]!r} isn't in the release")
     log(f"[build] {len(files)} files from {len(cfg.sources)} source(s)")
     if not lfs_pointers and (pointers := lfs.find_pointers(files)):
         shown = "\n  ".join(pointers[:20])
