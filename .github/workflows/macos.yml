@@ -1,9 +1,11 @@
-# macOS: Rust tests + an unsigned launcher build to try on a Mac (#66).
+# macOS: Rust tests + the launcher build (#66, #69).
 #
 # Windows is still built and released from Mike's machine; macOS can't be built from Windows,
-# so it runs here. The .app is unsigned (ad-hoc), so opening it needs System Settings >
-# Privacy & Security > Open Anyway the first time. Not a release: no updater signature here
-# (createUpdaterArtifacts is switched off for this build).
+# so it runs here. The .app is ad-hoc signed (no Apple Developer ID), so opening it needs
+# System Settings > Privacy & Security > Open Anyway the first time.
+# The artifact holds the .dmg (site download) and the .app.tar.gz the updater fetches. The
+# updater signature is NOT made here: the updater key stays on Mike's machine, which signs
+# the archive (tauri signer sign) before `prl upload-launcher --macos-archive`.
 name: macos
 
 on:
@@ -52,10 +54,25 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dv "$app" 2>&1 | grep -E 'Signature=adhoc|Sealed Resources'
 
-      - name: Upload the .dmg
+      # The updater's archive (tauri-plugin-updater's macOS install_inner): a .tar.gz whose
+      # first path component is the .app. COPYFILE_DISABLE stops bsdtar adding ._ AppleDouble
+      # entries, which would land inside the installed app.
+      - name: Updater archive (.app.tar.gz)
+        run: |
+          version=$(node -p "require('./launcher/src-tauri/tauri.conf.json').version")
+          archive="target/release/bundle/macos/Privateer Reimagined_${version}_aarch64.app.tar.gz"
+          COPYFILE_DISABLE=1 tar -czf "$archive" -C target/release/bundle/macos "Privateer Reimagined.app"
+          first=$(tar -tzf "$archive" | cut -d/ -f1 | sort -u)
+          [[ "$first" == "Privateer Reimagined.app" ]] || { echo "unexpected top level: $first"; exit 1; }
+          ! tar -tzf "$archive" | grep -q '/\._' || { echo "AppleDouble entries in the archive"; exit 1; }
+          ls -l "$archive"
+
+      - name: Upload the .dmg + updater archive
         uses: actions/upload-artifact@v4
         with:
           name: privateer-launcher-macos-arm64-${{ github.sha }}
-          path: target/release/bundle/dmg/*.dmg
+          path: |
+            target/release/bundle/dmg/*.dmg
+            target/release/bundle/macos/*.app.tar.gz
           if-no-files-found: error
           retention-days: 14

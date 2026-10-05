@@ -70,11 +70,18 @@ against the key compiled into them, run the installer passively and restart.
    $env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
    npx tauri build
    ```
-3. From `publisher/`, with the R2 variables set:
-   `uv run prl upload-launcher --installer <exe> --version <v> --notes "<one line>" --to r2`.
-   It uploads the installer and its `.sig` (immutable names), then points `latest.json` at them
-   last. It refuses an unsigned installer and refuses to offer an older version than the feed has.
-4. Point the website's download button at the new installer, **and** update the SHA-256 printed
+3. **macOS** (can't be built on Windows): push to `main` (or run the `macos` workflow by hand);
+   its artifact holds `Privateer Reimagined_<v>_aarch64.dmg` and `..._aarch64.app.tar.gz`.
+   Download it and sign the archive here, so the updater key never leaves this machine:
+   ```powershell
+   npx tauri signer sign -f "$env:USERPROFILE\.prl\launcher_updater.key" -p "" "<path>\Privateer Reimagined_<v>_aarch64.app.tar.gz"
+   ```
+4. From `publisher/`, with the R2 variables set (Windows and/or macOS, same version):
+   `uv run prl upload-launcher --installer <exe> --macos-archive <app.tar.gz> --macos-dmg <dmg> --version <v> --notes "<one line>" --to r2`.
+   It uploads each file and its `.sig` (immutable names), then points `latest.json` at them
+   last. One feed lists every platform for one version; a newer version never carries another
+   platform's older build. It refuses unsigned files and an older version than the feed has.
+5. Point the website's download buttons at the new files, **and** update the SHA-256s printed
    under "Open it" and the version in the note. Then `python tools/check_site_download.py`
    (and `--live` after the deploy): it downloads what the button links to and compares it with
    the printed hash (#62).

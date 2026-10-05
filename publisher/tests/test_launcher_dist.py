@@ -60,7 +60,7 @@ def test_bad_versions_are_rejected(tmp_path, version):
 
 
 def test_installer_and_version_must_agree(tmp_path):
-    with pytest.raises(ValueError, match="doesn't look like the 0.2.0 installer"):
+    with pytest.raises(ValueError, match="doesn't look like the 0.2.0 launcher"):
         launcher_dist.upload_installer(LocalStore(tmp_path), installer(tmp_path, "0.1.0"), "0.2.0", log=quiet)
 
 
@@ -101,6 +101,70 @@ def test_the_feed_never_rolls_back(tmp_path):
     assert json.loads(store.get("launcher/latest.json"))["notes"] == "fixed notes"   # same version: re-point ok
 
 
+# --- macOS (#69): .dmg for the site, signed .app.tar.gz for the updater, one shared feed ---
+
+def mac_files(tmp_path, version="0.3.2", sig="bWFjIHNpZw=="):
+    d = tmp_path / f"mac-{version}"
+    d.mkdir(exist_ok=True)
+    archive = d / f"Privateer Reimagined_{version}_aarch64.app.tar.gz"
+    archive.write_bytes(b"\x1f\x8b fake app archive " + version.encode())
+    dmg = d / f"Privateer Reimagined_{version}_aarch64.dmg"
+    dmg.write_bytes(b"fake dmg " + version.encode())
+    if sig is not None:
+        archive.with_name(archive.name + ".sig").write_text(sig + "\n")
+    return archive, dmg
+
+
+def test_macos_uploads_dmg_archive_sig_then_feed(tmp_path):
+    store = RecordingStore(tmp_path / "cdn")
+    archive, dmg = mac_files(tmp_path)
+    shas = launcher_dist.upload_macos(store, archive, dmg, "0.3.2", "mac notes", log=quiet)
+    dmg_key = "launcher/PrivateerReimagined-0.3.2-macos-arm64.dmg"
+    arc_key = "launcher/PrivateerReimagined-0.3.2-macos-arm64.app.tar.gz"
+    assert store.writes == [dmg_key, arc_key, arc_key + ".sig", "launcher/latest.json"]
+    assert shas[dmg_key] == hashlib.sha256(dmg.read_bytes()).hexdigest()
+    feed = json.loads(store.get("launcher/latest.json"))
+    assert feed["platforms"] == {"darwin-aarch64": {
+        "signature": "bWFjIHNpZw==", "url": f"https://cdn.privateer-reimagined.com/{arc_key}"}}
+
+
+def test_both_platforms_share_one_feed_at_the_same_version(tmp_path):
+    store = RecordingStore(tmp_path / "cdn")
+    launcher_dist.upload_installer(store, installer(tmp_path, "0.3.2"), "0.3.2", log=quiet)
+    archive, dmg = mac_files(tmp_path, "0.3.2")
+    launcher_dist.upload_macos(store, archive, dmg, "0.3.2", log=quiet)
+    feed = json.loads(store.get("launcher/latest.json"))
+    assert feed["version"] == "0.3.2" and set(feed["platforms"]) == {"windows-x86_64", "darwin-aarch64"}
+
+
+def test_a_newer_version_never_offers_another_platforms_older_build(tmp_path):
+    store = RecordingStore(tmp_path / "cdn")
+    archive, dmg = mac_files(tmp_path, "0.3.2")
+    launcher_dist.upload_macos(store, archive, dmg, "0.3.2", log=quiet)
+    launcher_dist.upload_installer(store, installer(tmp_path, "0.3.3"), "0.3.3", log=quiet)
+    feed = json.loads(store.get("launcher/latest.json"))
+    # The Mac entry was the 0.3.2 build: offering it as "0.3.3" would loop Macs on a re-install.
+    assert feed["version"] == "0.3.3" and set(feed["platforms"]) == {"windows-x86_64"}
+
+
+def test_unsigned_mac_archive_is_refused_before_anything_is_uploaded(tmp_path):
+    store = RecordingStore(tmp_path / "cdn")
+    archive, dmg = mac_files(tmp_path, sig=None)
+    with pytest.raises(FileNotFoundError, match="tauri signer sign"):
+        launcher_dist.upload_macos(store, archive, dmg, "0.3.2", log=quiet)
+    assert store.writes == []
+
+
+def test_cli_macos(tmp_path):
+    archive, dmg = mac_files(tmp_path, "0.3.2")
+    rc = cli.main(["upload-launcher", "--macos-archive", str(archive), "--macos-dmg", str(dmg),
+                   "--version", "0.3.2", "--to", str(tmp_path / "cdn")])
+    assert rc == 0 and (tmp_path / "cdn/launcher/PrivateerReimagined-0.3.2-macos-arm64.dmg").is_file()
+    with pytest.raises(SystemExit):   # archive without dmg
+        cli.main(["upload-launcher", "--macos-archive", str(archive), "--version", "0.3.2",
+                  "--to", str(tmp_path / "cdn")])
+
+
 def test_cache_headers():
     # #54: the feed changes every release; a cached copy would pin launchers to an old version.
     assert cache_control(launcher_dist.FEED_KEY) == "no-cache"
@@ -114,3 +178,5 @@ def test_content_types():
     assert content_type("channels/stable.json") == "application/json"
     assert content_type("launcher/X-Setup-0.1.0-x64.exe") == "application/vnd.microsoft.portable-executable"
     assert content_type("blobs/ab/abcdef.zst") == "application/octet-stream"
+    assert content_type("launcher/X-0.3.2-macos-arm64.dmg") == "application/x-apple-diskimage"
+    assert content_type("launcher/X-0.3.2-macos-arm64.app.tar.gz") == "application/gzip"

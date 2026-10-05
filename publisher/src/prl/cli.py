@@ -61,8 +61,10 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--deep", action="store_true", help="also download + hash every blob")
 
     u = sub.add_parser("upload-launcher",
-                       help="publish the launcher installer + signature, then point the update feed at it")
-    u.add_argument("--installer", type=Path, required=True, help="the NSIS setup .exe (its .sig beside it)")
+                       help="publish the launcher (Windows and/or macOS) + signatures, then point the update feed at it")
+    u.add_argument("--installer", type=Path, help="Windows: the NSIS setup .exe (its .sig beside it)")
+    u.add_argument("--macos-archive", type=Path, help="macOS: the .app.tar.gz the updater fetches (its .sig beside it)")
+    u.add_argument("--macos-dmg", type=Path, help="macOS: the .dmg people download from the site")
     u.add_argument("--version", required=True, help="launcher version, e.g. 0.1.0")
     u.add_argument("--notes", default="", help="release notes shown in the launcher's update prompt")
     u.add_argument("--to", required=True, help="'r2' or a local directory")
@@ -88,7 +90,15 @@ def main(argv: list[str] | None = None) -> int:
         data = ci.download_manifest(a.run, a.repo) if a.run else a.manifest.read_bytes()
         release.sign_publish(data, open_store(a.to), a.key, dry_run=a.dry_run)
     elif a.cmd == "upload-launcher":
-        launcher_dist.upload_installer(open_store(a.to), a.installer, a.version, a.notes)
+        if not a.installer and not a.macos_archive:
+            ap.error("upload-launcher needs --installer and/or --macos-archive + --macos-dmg")
+        if bool(a.macos_archive) != bool(a.macos_dmg):
+            ap.error("--macos-archive and --macos-dmg go together")
+        store = open_store(a.to)
+        if a.installer:
+            launcher_dist.upload_installer(store, a.installer, a.version, a.notes)
+        if a.macos_archive:
+            launcher_dist.upload_macos(store, a.macos_archive, a.macos_dmg, a.version, a.notes)
     elif a.cmd == "upload-file":
         store = open_store(a.to)
         for path in a.files:
