@@ -65,6 +65,7 @@ class LocalStore:
 # a download; .exe must arrive as a file to save.
 CONTENT_TYPES = {".json": "application/json", ".sig": "application/octet-stream",
                  ".exe": "application/vnd.microsoft.portable-executable",
+                 ".dmg": "application/x-apple-diskimage", ".gz": "application/gzip",
                  ".webm": "video/webm", ".mp4": "video/mp4", ".webp": "image/webp"}
 
 
