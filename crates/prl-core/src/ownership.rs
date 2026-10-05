@@ -213,6 +213,23 @@ mod tests {
     }
 
     #[test]
+    fn gog_mac_app_bundle_is_found_from_applications() {
+        // The exact layout of GOG's Mac release on Mike's Mac (macOS 26, #66): the game data
+        // sits inside the DOSBox app bundle, whose name has (R) and (TM) signs in it.
+        let applications = tempfile::tempdir().unwrap();
+        let app = applications.path().join("Wing Commander ® Privateer ™.app");
+        touch(&app.join("Contents/Resources/game/GAME.GOG"));
+        touch(&app.join("Contents/Resources/game/PRIV.EXE"));
+        touch(&app.join("Contents/MacOS/DOSBox"));
+        touch(&applications.path().join("Safari.app/Contents/Info.plist"));   // not a candidate
+        let candidates = privateer_subdirs(applications.path());
+        assert_eq!(candidates, vec![app.clone()]);
+        let found = validate(Storefront::Gog, &candidates[0]).unwrap();
+        assert_eq!(found.path, app);
+        assert!(found.marker.ends_with("Contents/Resources/game/GAME.GOG") || found.marker.ends_with("Contents/Resources/game/PRIV.EXE"));
+    }
+
+    #[test]
     fn privateer_2_and_empty_folders_are_rejected() {
         let t = tempfile::tempdir().unwrap();
         let p2 = t.path().join("Privateer 2 The Darkening");

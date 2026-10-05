@@ -68,16 +68,30 @@ impl Manifest {
                 return Err(Error::Format(format!("unknown encoding {:?} for {}", f.enc, f.path)));
             }
         }
-        if let Some(exe) = m.launch.get("windows") {
-            check_path(exe)?;
+        for exe in m.launch.values() {
+            check_path(exe)?;   // every OS's entry, not just this one's (#66)
         }
         Ok(m)
     }
 
     pub fn launch_target(&self) -> Option<&str> {
-        let os = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
-        self.launch.get(os).map(String::as_str)
+        self.launch.get(OS).map(String::as_str)
     }
+}
+
+/// This build's OS, as named in manifests' `launch` map and in platform channel names.
+pub const OS: &str = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
+
+/// The channel this OS reads (#66). A release is one file list, so each OS has its own
+/// channel: Windows keeps the bare name (every installed launcher reads `stable`), others
+/// add their OS (`stable-macos`). The pointer and the signed manifest both name the channel,
+/// so one OS's release can never be installed on another.
+pub fn platform_channel(base: &str) -> String {
+    platform_channel_for(base, OS)
+}
+
+fn platform_channel_for(base: &str, os: &str) -> String {
+    if os == "windows" { base.to_string() } else { format!("{base}-{os}") }
 }
 
 /// Same rules as `publisher/src/prl/paths.py::check`.
@@ -128,5 +142,32 @@ mod tests {
         assert!(Manifest::parse(make(&dupes).as_bytes()).is_err());
         assert!(Manifest::parse(make(&entry("x", "nothex")).as_bytes()).is_err());
         assert!(Manifest::parse(make(&entry("x", &"A".repeat(64))).as_bytes()).is_err());
+    }
+
+    fn with_launch(launch: &str) -> String {
+        format!(r#"{{"format":1,"product":"p","version":"1","channel":"stable","created_utc":"x","launch":{launch},"total_size":0,"files":[]}}"#)
+    }
+
+    #[test]
+    fn every_os_launch_path_is_checked_not_just_this_ones() {
+        assert!(Manifest::parse(with_launch(r#"{"windows":"game.exe","macos":"bin/game"}"#).as_bytes()).is_ok());
+        for evil in [r#"{"macos":"../../bin/sh"}"#, r#"{"linux":"/usr/bin/x"}"#, r#"{"windows":"C:/x.exe"}"#] {
+            assert!(Manifest::parse(with_launch(evil).as_bytes()).is_err(), "{evil} must be refused on every OS");
+        }
+    }
+
+    #[test]
+    fn each_os_reads_its_own_channel_and_windows_keeps_the_old_name() {
+        assert_eq!(platform_channel_for("stable", "windows"), "stable");   // launchers 0.1-0.3 read this
+        assert_eq!(platform_channel_for("stable", "macos"), "stable-macos");
+        assert_eq!(platform_channel_for("beta", "linux"), "beta-linux");
+        assert_eq!(platform_channel("stable"), platform_channel_for("stable", OS));
+    }
+
+    #[test]
+    fn launch_target_is_this_oss_entry() {
+        let m = Manifest::parse(with_launch(r#"{"windows":"w.exe","macos":"m","linux":"l"}"#).as_bytes()).unwrap();
+        let want = match OS { "windows" => "w.exe", "macos" => "m", _ => "l" };
+        assert_eq!(m.launch_target(), Some(want));
     }
 }

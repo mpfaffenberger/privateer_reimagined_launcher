@@ -17,6 +17,8 @@ let busy = false;
 
 // Offline with a game installed: play what's there rather than block on the update server.
 const canPlayOffline = () => !update && checkFailed && !!installedVersion;
+// The server answered, but nothing is published for this computer yet (#66): no fault, no retry.
+const nothingPublished = () => !!update && !update.published;
 
 function bytes(n) {
   if (n >= 1e9) return (n / 1e9).toFixed(2) + " GB";
@@ -37,7 +39,7 @@ function setBusy(on) {
 
 function render() {
   const primary = $("primary");
-  $("verify").disabled = busy || !owned || !update || !update.installed_version;
+  $("verify").disabled = busy || !owned || !update || !update.installed_version || nothingPublished();
   $("change-dir").disabled = busy;
   $("launcher-update").disabled = busy;
   if (!owned) {
@@ -49,7 +51,10 @@ function render() {
   $("retry").hidden = busy || !checkFailed;
   if (busy) return;
   if (!update) primary.textContent = canPlayOffline() ? "Play" : "Check for updates";
-  else if (!update.installed_version) primary.textContent = `Install (${bytes(update.download_bytes)})`;
+  else if (nothingPublished()) {
+    primary.textContent = update.installed_version ? "Play" : "Not available yet";
+    primary.disabled = !update.installed_version;
+  } else if (!update.installed_version) primary.textContent = `Install (${bytes(update.download_bytes)})`;
   else if (!update.up_to_date) primary.textContent = `Update (${bytes(update.download_bytes)})`;
   else primary.textContent = "Play";
 }
@@ -79,7 +84,11 @@ async function checkUpdate(repair = false) {
     update = await invoke("check_update", { repair });
     checkFailed = false;
     $("check-details").hidden = true;
-    const s = update.up_to_date
+    const s = !update.published
+      ? (update.installed_version
+          ? `Version ${update.installed_version} installed. No newer release for this computer yet.`
+          : "There's no release for this computer yet. Check back soon.")
+      : update.up_to_date
       ? `Version ${update.version}, up to date.`
       : update.installed_version
         ? `Version ${update.version} is available (installed: ${update.installed_version}). ` +
@@ -124,6 +133,7 @@ async function play() {
 async function primaryClicked() {
   if (canPlayOffline()) return play();
   if (!update) return checkUpdate();
+  if (nothingPublished()) return update.installed_version ? play() : undefined;
   if (update.up_to_date) return play();
   return installOrUpdate();
 }

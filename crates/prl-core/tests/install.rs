@@ -108,6 +108,45 @@ async fn tampered_or_unsigned_releases_are_refused() {
 }
 
 #[tokio::test]
+async fn an_unpublished_channel_is_no_release_but_a_broken_store_is_an_error() {
+    // #66: before the first Mac release, `stable-macos` doesn't exist. That's "nothing yet",
+    // which the launcher must not blame on the network.
+    let store = TestStore::new();
+    store.publish("1.0.0", &[("game.exe", b"MZ")]);
+    let game = tempfile::tempdir().unwrap();
+    let inst = installer(&store, game.path());
+    match inst.check("stable-macos").await {
+        Err(Error::NoRelease(channel)) => assert_eq!(channel, "stable-macos"),
+        other => panic!("expected NoRelease, got {other:?}"),
+    }
+    // A pointer whose manifest is gone is a broken store, never "nothing published".
+    std::fs::remove_file(store.path("manifests/1.0.0.json")).unwrap();
+    match inst.check("stable").await {
+        Err(Error::NoRelease(_)) | Ok(_) => panic!("a missing manifest must stay an error"),
+        Err(_) => {}
+    }
+}
+
+#[tokio::test]
+async fn a_release_for_another_os_is_refused_and_the_install_is_untouched() {
+    // #66: e.g. a Mac build published to Windows' channel by mistake.
+    let store = TestStore::new();
+    store.publish("1.0.0", &[("game.exe", b"MZ v1"), ("assets/a.txt", b"alpha")]);
+    let game = tempfile::tempdir().unwrap();
+    let inst = installer(&store, game.path());
+    install(&inst, Mode::Update).await;
+
+    let others: Vec<&str> = ["windows", "macos", "linux"].into_iter().filter(|o| *o != prl_core::format::OS).collect();
+    store.publish_for("2.0.0", &[("game", b"not for this OS")], &others);
+    match inst.check("stable").await {
+        Err(Error::Format(why)) => assert!(why.contains("isn't built for"), "{why}"),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    assert_eq!(read(game.path(), "game.exe"), b"MZ v1");
+    assert_eq!(inst.installed().unwrap().version, "1.0.0");
+}
+
+#[tokio::test]
 async fn a_corrupt_blob_never_replaces_installed_files() {
     let store = TestStore::new();
     store.publish("1.0.0", &[("game.exe", b"MZ good")]);

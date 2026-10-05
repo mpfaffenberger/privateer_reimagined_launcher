@@ -142,6 +142,8 @@ async fn set_install_dir(path: String, state: State<'_, AppState>) -> Result<Pat
 
 #[derive(Serialize)]
 struct UpdateInfo {
+    /// False when nothing is published for this OS yet (#66): not an error, just nothing to get.
+    published: bool,
     version: String,
     installed_version: Option<String>,
     up_to_date: bool,
@@ -154,7 +156,22 @@ struct UpdateInfo {
 async fn check_update(repair: bool, state: State<'_, AppState>) -> Result<UpdateInfo, String> {
     let _busy = begin(&state)?;
     let installer = Arc::new(state.installer());
-    let release = installer.check(CHANNEL).await.map_err(|e| e.to_string())?;
+    // This OS's channel: `stable` on Windows, `stable-macos` on a Mac (#66).
+    let release = match installer.check(&prl_core::format::platform_channel(CHANNEL)).await {
+        Err(prl_core::Error::NoRelease(_)) => {
+            *state.release.lock().unwrap() = None;
+            return Ok(UpdateInfo {
+                published: false,
+                version: String::new(),
+                installed_version: installer.installed().map(|m| m.version),
+                up_to_date: false,
+                download_bytes: 0,
+                files_to_write: 0,
+                files_to_remove: 0,
+            });
+        }
+        other => other.map_err(|e| e.to_string())?,
+    };
     let (inst, rel) = (installer.clone(), release.clone());
     let mode = if repair { Mode::Repair } else { Mode::Update };
     let plan = tokio::task::spawn_blocking(move || inst.plan(&rel, mode))
@@ -162,6 +179,7 @@ async fn check_update(repair: bool, state: State<'_, AppState>) -> Result<Update
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())?;
     let info = UpdateInfo {
+        published: true,
         version: release.manifest.version.clone(),
         installed_version: installer.installed().map(|m| m.version),
         up_to_date: plan.up_to_date,

@@ -179,7 +179,13 @@ impl Installer {
         if channel.is_empty() || !channel.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
             return Err(Error::Format(format!("bad channel name {channel:?}")));
         }
-        let pointer: ChannelPointer = serde_json::from_slice(&self.source.get(&format!("channels/{channel}.json")).await?)
+        // No pointer = nothing published on this channel (yet). Only here: a missing manifest or
+        // signature behind an existing pointer is a broken store and stays an error.
+        let pointer_bytes = match self.source.get(&format!("channels/{channel}.json")).await {
+            Err(Error::NotFound(_)) => return Err(Error::NoRelease(channel.to_string())),
+            other => other?,
+        };
+        let pointer: ChannelPointer = serde_json::from_slice(&pointer_bytes)
             .map_err(|e| Error::Format(format!("channel pointer: {e}")))?;
         let untrusted = |why: &str| Err(Error::Untrusted(why.to_string()));
         if pointer.format != FORMAT || pointer.channel != channel {
@@ -198,6 +204,11 @@ impl Installer {
         let manifest = Manifest::parse(&bytes)?;
         if manifest.channel != channel || manifest.version != pointer.version {
             return untrusted("manifest channel/version disagree with the pointer");
+        }
+        // A release built for another OS (published to the wrong channel by mistake) would
+        // replace a working install with files this computer can't run: refuse it (#66).
+        if manifest.launch_target().is_none() {
+            return Err(Error::Format(format!("release {} isn't built for {}", manifest.version, format::OS)));
         }
         Ok(Release { pointer, manifest, manifest_bytes: bytes })
     }
@@ -371,6 +382,41 @@ impl Installer {
         let manifest = self.installed().ok_or_else(|| Error::Format("the game is not installed".into()))?;
         let exe = manifest.launch_target().ok_or_else(|| Error::Format("this release has no launcher entry for this OS".into()))?;
         let path = format::install_path(&self.root, exe);
+        make_executable(&path)?;
         std::process::Command::new(&path).current_dir(&self.root).spawn().map_err(io_err(&path))
+    }
+}
+
+/// Installed files are written without an execute bit, which Windows ignores but macOS and
+/// Linux won't run (#66). Set it on the launch target right before starting it, so a repair or
+/// any other way the file was (re)placed is covered too.
+#[cfg(unix)]
+fn make_executable(path: &std::path::Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = std::fs::metadata(path).map_err(io_err(path))?.permissions();
+    if perms.mode() & 0o111 != 0o111 {
+        perms.set_mode(perms.mode() | 0o755);
+        std::fs::set_permissions(path, perms).map_err(io_err(path))?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_executable(_path: &std::path::Path) -> Result<()> {
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod unix_tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn launch_target_becomes_executable() {
+        let dir = tempfile::tempdir().unwrap();
+        let exe = dir.path().join("game");
+        std::fs::write(&exe, b"#!/bin/sh\n").unwrap();
+        std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o644)).unwrap();
+        super::make_executable(&exe).unwrap();
+        assert_eq!(std::fs::metadata(&exe).unwrap().permissions().mode() & 0o777, 0o755);
     }
 }
