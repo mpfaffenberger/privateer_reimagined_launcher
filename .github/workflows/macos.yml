@@ -39,6 +39,10 @@ jobs:
         with:
           node-version: 22
 
+      # app.js in a vm with stubbed Tauri calls (#88): no window, no dependencies.
+      - name: Launcher UI tests
+        run: node --test launcher/ui/app.test.mjs
+
       - name: Build the unsigned launcher (.app + .dmg)
         working-directory: launcher
         run: |
