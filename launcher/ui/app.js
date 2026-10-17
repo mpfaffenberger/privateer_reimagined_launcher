@@ -42,13 +42,15 @@ function render() {
   $("verify").disabled = busy || !owned || !update || !update.installed_version || nothingPublished();
   $("change-dir").disabled = busy;
   $("launcher-update").disabled = busy;
+  // "Check for updates" (#88) whenever idle with Privateer found; "Try again" after a failed check.
+  $("check-now").hidden = busy || !owned;
+  $("check-now").textContent = checkFailed ? "Try again" : "Check for updates";
   if (!owned) {
     primary.disabled = true;
     primary.textContent = "Privateer required";
     return;
   }
   primary.disabled = busy;
-  $("retry").hidden = busy || !checkFailed;
   if (busy) return;
   if (!update) primary.textContent = canPlayOffline() ? "Play" : "Check for updates";
   else if (nothingPublished()) {
@@ -241,6 +243,24 @@ function recheck() {
   recheckGame().catch(() => {});
 }
 
+// One full signed game check, as start-up and "Check for updates" run it. Probe first: if the
+// pointer moves before the check below, the next probe differs and re-checks. The other way
+// round, a release landing in between would go unnoticed.
+async function checkGameNow() {
+  releaseHint = await invoke("release_hint").catch(() => undefined);
+  await checkUpdate();
+}
+
+// "Check for updates" (#88): everything a timed recheck does, now, whatever the timers say; the
+// ten minutes start again from here.
+async function checkNow() {
+  if (busy) return;
+  lastRecheck = Date.now();
+  loadNews().catch(() => {});
+  checkLauncherUpdate().catch(() => {});
+  await checkGameNow();
+}
+
 async function main() {
   lastRecheck = Date.now();               // the start-up checks below count as the first round
   loadNews().catch(() => {});             // never holds up the game controls
@@ -256,7 +276,7 @@ async function main() {
       : `Downloading ${bytes(p.done)}`;
   });
   $("primary").addEventListener("click", primaryClicked);
-  $("retry").addEventListener("click", () => checkUpdate());
+  $("check-now").addEventListener("click", checkNow);
   $("verify").addEventListener("click", verifyClicked);
   $("browse-privateer").addEventListener("click", browsePrivateer);
   $("get-gog").addEventListener("click", () => openUrl(GOG_URL));
@@ -275,12 +295,7 @@ async function main() {
   $("install-dir").textContent = status.install_dir;
   $("footer").title = `Update store: ${status.cdn}`;   // for testers (PRL_CDN); players don't need it
   renderOwnership(status.owned);
-  if (status.owned) {
-    // Probe first: if the pointer moves before the check below, the next probe differs and
-    // re-checks. The other way round, a release landing in between would go unnoticed.
-    releaseHint = await invoke("release_hint").catch(() => undefined);
-    await checkUpdate();
-  }
+  if (status.owned) await checkGameNow();
 }
 
 main().catch((e) => showError(String(e)));

@@ -55,6 +55,12 @@ the DOM's focus events don't fire in WebView2) and on a one-minute tick, at most
   changed (no flash), and keeps what it shows while offline. No cache-buster is needed: the site
   serves `/launcher/` with `max-age=0, must-revalidate`.
 - **The launcher itself:** as below, at most hourly.
+- **"Check for updates"** (#88), the link beside the game's status line, runs all three now,
+  whatever the timers say, and restarts the ten minutes. It's there whenever the launcher is
+  idle with Privateer found, and reads "Try again" after a failed check.
+
+The UI's own logic has tests: `node --test launcher/ui/app.test.mjs` runs `app.js` in a `vm` with
+its Tauri calls stubbed (no window, no dependencies); the `macos` workflow runs them too.
 
 Settings live in `%APPDATA%\com.privateer-reimagined.launcher\launcher.json` (the
 Privateer folder found, and the install folder). The default install folder is
