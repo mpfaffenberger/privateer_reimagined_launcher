@@ -78,7 +78,13 @@ pub struct Installer {
     root: PathBuf,
 }
 
-fn sha256_hex(data: &[u8]) -> String {
+fn untrusted<T>(why: &str) -> Result<T> {
+    Err(Error::Untrusted(why.to_string()))
+}
+
+/// Lowercase hex SHA-256: the hash every manifest and pointer uses (also the launcher's news
+/// digest, #78).
+pub fn sha256_hex(data: &[u8]) -> String {
     hex::encode(Sha256::digest(data))
 }
 
@@ -174,8 +180,11 @@ impl Installer {
         self.root.join(STATE_DIR)
     }
 
-    /// Fetch and verify the channel's current release (docs/DESIGN.md order).
-    pub async fn check(&self, channel: &str) -> Result<Release> {
+    /// The channel's pointer alone, checked for shape (format, channel, manifest name) but
+    /// unsigned: only its manifest is signed. Cheap, so a launcher left open can poll it to
+    /// notice a new release (#78); trust nothing from it beyond "something changed", and get the
+    /// release itself from `check`.
+    pub async fn pointer(&self, channel: &str) -> Result<ChannelPointer> {
         if channel.is_empty() || !channel.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
             return Err(Error::Format(format!("bad channel name {channel:?}")));
         }
@@ -187,7 +196,6 @@ impl Installer {
         };
         let pointer: ChannelPointer = serde_json::from_slice(&pointer_bytes)
             .map_err(|e| Error::Format(format!("channel pointer: {e}")))?;
-        let untrusted = |why: &str| Err(Error::Untrusted(why.to_string()));
         if pointer.format != FORMAT || pointer.channel != channel {
             return untrusted("channel pointer does not match the requested channel");
         }
@@ -195,6 +203,12 @@ impl Installer {
         if pointer.version.contains('/') || pointer.manifest != format!("manifests/{}.json", pointer.version) {
             return untrusted("channel pointer names an unexpected manifest");
         }
+        Ok(pointer)
+    }
+
+    /// Fetch and verify the channel's current release (docs/DESIGN.md order).
+    pub async fn check(&self, channel: &str) -> Result<Release> {
+        let pointer = self.pointer(channel).await?;
         let bytes = self.source.get(&pointer.manifest).await?;
         if sha256_hex(&bytes) != pointer.manifest_sha256 {
             return untrusted("manifest does not match the channel pointer's hash");

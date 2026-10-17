@@ -25,6 +25,26 @@ fn read(game: &std::path::Path, p: &str) -> Vec<u8> {
 }
 
 #[tokio::test]
+async fn pointer_is_the_cheap_probe_for_a_new_release() {
+    // A launcher left open polls it (#78): nothing published, then each publish, as `check` sees.
+    let store = TestStore::new();
+    let game = tempfile::tempdir().unwrap();
+    let inst = installer(&store, game.path());
+    assert!(matches!(inst.pointer("stable").await, Err(Error::NoRelease(_))));
+
+    store.publish("1.0.0", &[("game.exe", b"MZ v1")]);
+    let first = inst.pointer("stable").await.unwrap();
+    assert_eq!(first.version, "1.0.0");
+    assert_eq!(first, inst.check("stable").await.unwrap().pointer);
+
+    store.publish("1.0.1", &[("game.exe", b"MZ v2")]);
+    let second = inst.pointer("stable").await.unwrap();
+    assert_eq!(second.version, "1.0.1");
+    assert_ne!(first.manifest_sha256, second.manifest_sha256);
+    assert!(matches!(inst.pointer("bad/name").await, Err(Error::Format(_))));
+}
+
+#[tokio::test]
 async fn fresh_install_then_up_to_date() {
     let store = TestStore::new();
     store.publish("1.0.0", &[("game.exe", b"MZ v1"), ("assets/a.txt", b"alpha"), ("assets/n.raw", b"noise")]);

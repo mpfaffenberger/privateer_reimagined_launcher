@@ -201,26 +201,54 @@ async function updateLauncher() {
   }
 }
 
-// The news panel (#44): shown only if the site answers now; otherwise the built-in fallback.
+// The news panel (#44): shown only if the site answers; otherwise the built-in fallback. Reloaded
+// only when the page changed (#78), so a launcher left open picks up news without a flash.
+let newsDigest = null;   // the page the panel shows
+
 async function loadNews() {
-  const url = await invoke("news_url");
-  if (!url) return;
+  const page = await invoke("news_page");
+  if (!page || page.digest === newsDigest) return;   // offline: keep the news (or fallback) shown
   const frame = $("news-frame");
   frame.addEventListener("load", () => {
+    newsDigest = page.digest;
     frame.hidden = false;
     $("news-fallback").hidden = true;
   }, { once: true });
-  frame.src = url;
+  frame.src = page.url;   // the site serves it max-age=0, must-revalidate: always fresh
+}
+
+// A launcher left open (#78) re-checks game releases and news when the player comes back to the
+// window and on a timer (a window left in front never gets a focus event). Both probes are cheap:
+// the channel pointer and the news page. The full verified check runs only when the pointer moved.
+const RECHECK_MS = 10 * 60 * 1000;
+const RECHECK_TICK_MS = 60 * 1000;   // a no-op unless a check is due: focus and timer never stack
+let lastRecheck = 0;
+let releaseHint;   // the pointer behind the current `update` (undefined: not probed yet)
+
+async function recheckGame() {
+  if (busy || !owned) return;
+  const hint = await invoke("release_hint");   // offline: throws, and the last result stands
+  if (busy || (update && hint === releaseHint)) return;   // an install started, or nothing new
+  releaseHint = hint;
+  await checkUpdate();
+}
+
+function recheck() {
+  if (launcherRecheckDue()) checkLauncherUpdate().catch(() => {});
+  if (Date.now() - lastRecheck < RECHECK_MS) return;
+  lastRecheck = Date.now();
+  loadNews().catch(() => {});
+  recheckGame().catch(() => {});
 }
 
 async function main() {
+  lastRecheck = Date.now();               // the start-up checks below count as the first round
   loadNews().catch(() => {});             // never holds up the game controls
   checkLauncherUpdate().catch(() => {});  // offline: simply no offer
   // The native window's focus event: in WebView2 the DOM's focus/visibilitychange don't fire
   // when the player comes back to the window (checked on a real minimize + restore).
-  await listen("tauri://focus", () => {
-    if (launcherRecheckDue()) checkLauncherUpdate().catch(() => {});
-  });
+  await listen("tauri://focus", recheck);
+  setInterval(recheck, RECHECK_TICK_MS);
   $("launcher-update").addEventListener("click", updateLauncher);
   await listen("launcher-progress", ({ payload: p }) => {
     $("launcher-update-progress").textContent = p.total
@@ -247,7 +275,12 @@ async function main() {
   $("install-dir").textContent = status.install_dir;
   $("footer").title = `Update store: ${status.cdn}`;   // for testers (PRL_CDN); players don't need it
   renderOwnership(status.owned);
-  if (status.owned) await checkUpdate();
+  if (status.owned) {
+    // Probe first: if the pointer moves before the check below, the next probe differs and
+    // re-checks. The other way round, a release landing in between would go unnoticed.
+    releaseHint = await invoke("release_hint").catch(() => undefined);
+    await checkUpdate();
+  }
 }
 
 main().catch((e) => showError(String(e)));
