@@ -31,8 +31,8 @@ with `prl build` + `prl publish --to <folder>`):
 
 The left half of the window shows <https://privateer-reimagined.com/launcher/>, which is
 `site/launcher/index.html` in this repo. Edit that page and merge, and every launcher shows the
-change the next time it starts; no launcher release needed (#44). The buttons and every rule
-stay compiled into the launcher.
+change within about ten minutes, even one left open (#78); no launcher release needed (#44). The
+buttons and every rule stay compiled into the launcher.
 
 - The panel is `<iframe sandbox="allow-same-origin allow-popups">`: no scripts, forms or
   top-level navigation, and no access to the launcher's commands. Keep the page script-free.
@@ -41,6 +41,20 @@ stay compiled into the launcher.
 - The site lets only the launcher frame that page (`site/_headers`, `frame-ancestors`), and
   the launcher's CSP frames only the site (`frame-src`, checked by a unit test).
 - If the page doesn't answer within 4 s (offline), the panel shows a built-in message.
+
+## Staying current while open (#78)
+
+A launcher left open re-checks when the player comes back to the window (Tauri's `tauri://focus`;
+the DOM's focus events don't fire in WebView2) and on a one-minute tick, at most every ten minutes:
+
+- **Game releases:** `release_hint` reads only this OS's channel pointer and returns its manifest
+  hash. Only when that changes (or after an offline start) does the full signed `check_update` run.
+  The hint takes no lock and is trusted for nothing: installs come from the verified release.
+  No background check runs while an install or verify is.
+- **News:** `news_page` fetches the page and its SHA-256; the panel reloads only when the page
+  changed (no flash), and keeps what it shows while offline. No cache-buster is needed: the site
+  serves `/launcher/` with `max-age=0, must-revalidate`.
+- **The launcher itself:** as below, at most hourly.
 
 Settings live in `%APPDATA%\com.privateer-reimagined.launcher\launcher.json` (the
 Privateer folder found, and the install folder). The default install folder is
@@ -58,8 +72,8 @@ Produces `target\release\bundle\nsis\Privateer Reimagined_<version>_x64-setup.ex
 ## Release a new launcher (it updates itself, #48)
 
 Installed launchers (0.3.0 and later) read `https://cdn.privateer-reimagined.com/launcher/latest.json`
-at start and again when the player comes back to the window (Tauri's `tauri://focus`; at most
-hourly, #57), offer a newer version in a banner, and on **Update** download it, check its signature
+at start and again when the player comes back to the window or while it stays open (at most
+hourly, #57, #78), offer a newer version in a banner, and on **Update** download it, check its signature
 against the key compiled into them, run the installer passively and restart.
 
 1. Bump the version in `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml` and `package.json`

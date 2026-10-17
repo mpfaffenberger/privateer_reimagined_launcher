@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use prl_core::install::{Installer, Mode, Progress, Release};
+use prl_core::install::{sha256_hex, Installer, Mode, Progress, Release};
 use prl_core::ownership::{self, Found, Storefront};
 use prl_core::source::Source;
 use serde::{Deserialize, Serialize};
@@ -263,13 +263,37 @@ async fn install_launcher_update(app: AppHandle, state: State<'_, AppState>) -> 
     app.restart()
 }
 
-/// The news page's URL if it answers 200 now, else None so the UI shows its built-in fallback
-/// instead of WebView2's "can't reach this page".
+/// The live release's identity (its manifest hash), or None when nothing is published for this
+/// OS: the cheap "anything new?" probe of a launcher left open (#78). It reads only the channel
+/// pointer, so it doesn't take the one-operation lock and never blocks an install; whatever gets
+/// installed still comes from check_update's fully verified release.
 #[tauri::command]
-async fn news_url() -> Option<String> {
+async fn release_hint(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    match state.installer().pointer(&prl_core::format::platform_channel(CHANNEL)).await {
+        Ok(pointer) => Ok(Some(pointer.manifest_sha256)),
+        Err(prl_core::Error::NoRelease(_)) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[derive(Serialize)]
+struct NewsPage {
+    url: &'static str,
+    /// SHA-256 of the page: a launcher left open reloads the panel only when the news changed.
+    digest: String,
+}
+
+/// The news page if it answers 200 now, else None: the UI keeps its built-in fallback (instead
+/// of WebView2's "can't reach this page"), or the news it already shows (#78).
+#[tauri::command]
+async fn news_page() -> Option<NewsPage> {
     let client = reqwest::Client::builder().timeout(NEWS_TIMEOUT).build().ok()?;
-    let ok = client.get(NEWS_URL).send().await.is_ok_and(|r| r.status().is_success());
-    ok.then(|| NEWS_URL.to_string())
+    let response = client.get(NEWS_URL).send().await.ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let body = response.bytes().await.ok()?;   // NEWS_TIMEOUT covers the body too
+    Some(NewsPage { url: NEWS_URL, digest: sha256_hex(&body) })
 }
 
 /// Links the panel opens in a new window go to the system browser, and only web links: never
@@ -328,7 +352,8 @@ pub fn run() {
             check_update,
             install,
             launch_game,
-            news_url,
+            news_page,
+            release_hint,
             check_launcher_update,
             install_launcher_update
         ])
