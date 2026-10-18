@@ -39,3 +39,19 @@ body.news {
 .notes time { color: var(--sodium); font-size: 0.85rem; padding-top: 1px; }
 .notes p { margin: 0; }
 .notes b { color: var(--bone); font-weight: 600; }
+
+/* Release notes (#98): the launcher shows the SAME added:/fixed: list the
+   announcement channel gets, so one release never gets two different stories.
+   Scoped to .changes so the date grid above never leaks into the nested list. */
+.notes ul.changes {
+  list-style: disc;
+  margin: 6px 0 0;
+  padding-left: 1.15rem;
+  color: var(--stone);
+}
+.notes ul.changes li {
+  display: list-item;
+  padding: 2px 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
