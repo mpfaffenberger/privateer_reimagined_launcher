@@ -246,3 +246,35 @@ async fn progress_reports_reach_done() {
     assert_eq!(last.1, plan.download_bytes);
     assert!(seen.windows(2).all(|w| w[0].0 != "download" || w[1].0 != "download" || w[0].1 <= w[1].1));
 }
+
+/// #118, Dels' loop: 0.1.19 shipped a mesh cache, and the game rebuilt it (with new bytes) the
+/// first time that ship loaded, so every reopen offered the installed version again. Releases
+/// now leave those caches to the game: updating drops the shipped copy, and after that neither a
+/// reopen nor "Verify files" flags the cache the game rebuilds.
+#[tokio::test]
+async fn caches_the_game_rebuilds_stop_reoffering_the_installed_version() {
+    let (mesh, cache) = ("assets/meshes/ship.obj", "assets/meshes/ship.npmesh");
+    let store = TestStore::new();
+    store.publish("0.1.19", &[("game.exe", b"MZ v19"), (mesh, b"v 0 0 0"), (cache, b"NPMESH02 shipped")]);
+    let game = tempfile::tempdir().unwrap();
+    let inst = installer(&store, game.path());
+    install(&inst, Mode::Update).await;
+    let rebuild = |bytes: &[u8]| std::fs::write(game.path().join(cache), bytes).unwrap();
+
+    rebuild(b"NPMESH02 rebuilt on the player's machine");
+    let release = inst.check("stable").await.unwrap();
+    let reopen = inst.plan(&release, Mode::Update).unwrap();
+    assert!(!reopen.up_to_date, "a shipped cache the game rebuilt reads as a modified release file");
+    assert_eq!(reopen.place.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), [cache]);
+
+    store.publish("0.1.20", &[("game.exe", b"MZ v20"), (mesh, b"v 0 0 0")]);
+    let update = install(&inst, Mode::Update).await;
+    assert_eq!(update.remove, [cache.to_string()], "the shipped cache goes; the game rebuilds its own");
+    rebuild(b"NPMESH02 rebuilt by the game");
+    let release = inst.check("stable").await.unwrap();
+    for mode in [Mode::Update, Mode::Repair] {
+        let reopen = inst.plan(&release, mode).unwrap();
+        assert!(reopen.up_to_date, "{mode:?} after the game rebuilt its cache: {reopen:?}");
+    }
+    assert_eq!(read(game.path(), cache), b"NPMESH02 rebuilt by the game", "and the launcher leaves it alone");
+}

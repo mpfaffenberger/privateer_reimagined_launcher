@@ -34,4 +34,10 @@ exclude = [
   "**/.DS_Store",
   "**/Thumbs.db",
   "**/desktop.ini",
+  # Runtime caches the game rebuilds from the .obj beside them (#118). It trusts a cache
+  # only if it's newer than its .obj, which an install's file times don't guarantee, and
+  # every rebuild has different bytes. A shipped cache therefore turns into a modified
+  # release file once that ship loads, and the launcher offers the same version again.
+  # Left out, the game owns them. (assets/debug's caches have no .obj: they ship.)
+  "meshes/**/*.npmesh",
 ]
