@@ -223,6 +223,9 @@ figcaption { font-size: 0.9rem; color: var(--stone); margin-top: 10px; }
 @media (min-width: 1000px) { .fleet { grid-template-columns: repeat(4, 1fr); } }
 .fleet figcaption { margin-top: 8px; }
 .fleet figcaption b { font-family: var(--display); font-weight: 700; color: var(--bone); margin-right: 0.4em; }
+/* Two more set pieces after the roster, side by side once there's room. */
+.pair { display: grid; gap: 22px 16px; }
+@media (min-width: 860px) { .pair { grid-template-columns: 1fr 1fr; } }
 
 /* Story: words and a bar scene on the left, the cast on the right, every other face
    dropped lower, like stills pinned to a board. */
