@@ -49,14 +49,17 @@ def check_os(os_name: str) -> str:
     return os_name
 
 
+def channel_os(channel: str) -> str:
+    """The OS whose launchers read `channel`: Windows reads the bare name (`stable`), others
+    `<channel>-<os>` (prl-core's platform_channel)."""
+    return next((o for o in OSES if channel.endswith(f"-{o}")), "windows")
+
+
 def check_channel_for_os(channel: str, os_name: str) -> str:
-    """Mirror of prl-core's platform_channel: Windows launchers read the bare channel
-    (`stable`), others read `<channel>-<os>`. Publishing an OS's build anywhere else would
-    offer it to launchers on the wrong OS, which would replace a working install."""
+    """Publishing an OS's build to another OS's channel would offer it to launchers on the
+    wrong OS, which would replace a working install."""
     check_os(os_name)
-    os_suffix = next((o for o in OSES if channel.endswith(f"-{o}")), None)
-    expected = "windows" if os_suffix is None else os_suffix
-    if expected != os_name:
+    if channel_os(channel) != os_name:
         want = "a channel without an OS suffix" if os_name == "windows" else f"a channel ending in -{os_name}"
         raise ValueError(f"a {os_name} build must go to {want}, not {channel!r}")
     return channel

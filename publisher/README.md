@@ -59,7 +59,9 @@ local file instead.
   local store (`dist/store`, which doubles as a cache across releases). Already-compressed
   files (PNG, MP3) are stored raw.
 - `publish` uploads only blobs R2 doesn't have, then the manifest and signature, and moves
-  `channels/<channel>.json` **last**, so players never see a half-uploaded release.
+  `channels/<channel>.json` **last**, so players never see a half-uploaded release. Just
+  before the pointer, it adds the release's game executable to `stats/markers.json`, which
+  the site counts downloads by ([`docs/DOWNLOAD_COUNTS.md`](../docs/DOWNLOAD_COUNTS.md)).
 - Versions are immutable: rebuilding one with different contents is refused.
 - `--to` / `--store` also accept a local folder, handy for dry runs and launcher testing.
 

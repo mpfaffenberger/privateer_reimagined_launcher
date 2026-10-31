@@ -1,5 +1,5 @@
-// Cloudflare Workers (static assets only) for privateer-reimagined.com (#5).
-// Workers Builds runs `npx wrangler deploy` on every push to main.
+// Cloudflare Worker for privateer-reimagined.com (#5): the static site, plus download counts
+// (#130, docs/DOWNLOAD_COUNTS.md). Workers Builds runs `npx wrangler deploy` on every push to main.
 // `name` MUST match the Worker/project name in the Cloudflare dashboard.
 {
   "name": "privateer-reimagined-launcher",
@@ -11,8 +11,24 @@
     { "pattern": "www.privateer-reimagined.com", "custom_domain": true }
   ],
   "workers_dev": true,
+  // The script runs only for /stats/ and the daily cron; every other request is a static asset,
+  // served without it.
+  "main": "worker/index.js",
   "assets": {
     "directory": "./site",
-    "not_found_handling": "404-page"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/stats", "/stats/"]
+  },
+  // Once a day, after midnight UTC: read yesterday's (and the two days before's) totals.
+  "triggers": { "crons": ["30 2 * * *"] },
+  // Not secret. The read-only analytics token is: the CF_API_TOKEN secret, set in the dashboard.
+  "vars": {
+    "CF_ACCOUNT_ID": "4afa37408c9fefdc7e87fba7f1c99bb4",
+    "R2_BUCKET": "privateer-reimagined"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "COUNTS", "class_name": "DownloadCounts" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["DownloadCounts"] }]
 }
