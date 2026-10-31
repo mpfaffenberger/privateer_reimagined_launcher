@@ -6,6 +6,7 @@ const { openUrl } = window.__TAURI__.opener;
 
 const GOG_URL = "https://www.gog.com/en/game/wing_commander_privateer";
 const PRIVACY_URL = "https://privateer-reimagined.com/privacy/";   // #61
+const DISCORD_URL = "https://discord.gg/9Vhm4tdymY";   // #131: the invite the website uses
 const $ = (id) => document.getElementById(id);
 const STORE_NAMES = { gog: "GOG", steam: "Steam", folder: "your folder" };
 
@@ -281,6 +282,7 @@ async function main() {
   $("browse-privateer").addEventListener("click", browsePrivateer);
   $("get-gog").addEventListener("click", () => openUrl(GOG_URL));
   $("privacy").addEventListener("click", () => openUrl(PRIVACY_URL));
+  $("discord").addEventListener("click", () => openUrl(DISCORD_URL));
   $("change-dir").addEventListener("click", changeInstallDir);
   await listen("progress", ({ payload: p }) => {
     const pct = p.total_bytes ? Math.round((p.done_bytes / p.total_bytes) * 100) : 100;

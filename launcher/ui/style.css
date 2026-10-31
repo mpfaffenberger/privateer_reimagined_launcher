@@ -95,3 +95,4 @@ details p { margin: 4px 0 0; user-select: text; overflow-wrap: anywhere; }
 footer { text-align: center; margin-top: 6px; }
 footer p { margin: 0; }
 footer .link { font-size: inherit; padding: 0; }
+footer .sep { margin: 0 6px; }
