@@ -35,6 +35,7 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 10));
 async function boot(answers = {}) {
   const all = { ...DEFAULTS, ...answers };
   const calls = [];
+  const opened = [];                    // URLs handed to the system browser
   const invoke = async (cmd, args) => {
     calls.push(cmd);
     return typeof all[cmd] === "function" ? all[cmd](args) : all[cmd];
@@ -49,11 +50,12 @@ async function boot(answers = {}) {
     createTextNode: (text) => text,
   };
   const window = { __TAURI__: { core: { invoke }, event: { listen: async () => {} },
-                                dialog: { open: async () => null }, opener: { openUrl: async () => {} } } };
+                                dialog: { open: async () => null },
+                                opener: { openUrl: async (url) => { opened.push(url); } } } };
   const ctx = vm.createContext({ window, document, setInterval: () => 0, Date, console });
   vm.runInContext(SRC, ctx);
   await settle();                       // start-up: status, ownership, the first check
-  return { $: (id) => document.getElementById(id), calls };
+  return { $: (id) => document.getElementById(id), calls, opened };
 }
 
 test("idle with Privateer found, the status line offers Check for updates", async () => {
@@ -95,3 +97,14 @@ test("hidden when Privateer isn't found", async () => {
   const { $ } = await boot({ get_status: { ...DEFAULTS.get_status, owned: null } });
   assert.equal($("check-now").hidden, true);
 });
+
+// The footer's links (#61, #131) go to the system browser, and only to the one site each names.
+for (const [id, url] of [["privacy", "https://privateer-reimagined.com/privacy/"],
+                         ["discord", "https://discord.gg/9Vhm4tdymY"]]) {
+  test(`the ${id} link opens ${url} in the browser`, async () => {
+    const { $, opened } = await boot();
+    assert.deepEqual(opened, [], "nothing opens by itself");
+    await $(id).click();
+    assert.deepEqual(opened, [url]);
+  });
+}

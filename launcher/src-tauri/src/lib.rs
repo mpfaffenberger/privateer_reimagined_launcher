@@ -371,7 +371,9 @@ mod tests {
 
     #[test]
     fn only_web_links_leave_the_launcher() {
-        for ok in ["https://privateer-reimagined.com/#fleet", "http://example.com/"] {
+        // The footer's privacy and Discord links (#61, #131) take the same path as the news panel's.
+        for ok in ["https://privateer-reimagined.com/#fleet", "https://privateer-reimagined.com/privacy/",
+                   "https://discord.gg/9Vhm4tdymY", "http://example.com/"] {
             assert_eq!(external_url(&Url::parse(ok).unwrap()), Some(ok));
         }
         for bad in ["file:///C:/Windows/system32/calc.exe", "javascript:alert(1)", "ms-settings:",
