@@ -43,6 +43,10 @@ jobs:
       - name: Launcher UI tests
         run: node --test launcher/ui/app.test.mjs
 
+      # The site Worker's download counts (#130): plain JS, no Workers runtime needed.
+      - name: Site Worker tests
+        run: node --test worker/stats.test.mjs
+
       - name: Build the unsigned launcher (.app + .dmg)
         working-directory: launcher
         run: |
