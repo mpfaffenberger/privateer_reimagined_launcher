@@ -380,6 +380,34 @@ mod tests {
         }
     }
 
+    /// The `const X_URL = "..."` links ui/app.js hands to the opener plugin.
+    fn ui_urls() -> std::collections::BTreeSet<String> {
+        include_str!("../../ui/app.js").lines()
+            .filter(|l| l.starts_with("const ") && l.contains("_URL = \""))
+            .map(|l| l.split('"').nth(1).unwrap().to_string())
+            .collect()
+    }
+
+    /// The opener refuses any URL its capability scope doesn't list (#132): an unscoped
+    /// `opener:allow-open-url` refuses everything. So the scope names exactly the UI's links.
+    #[test]
+    fn opener_allows_exactly_the_ui_links() {
+        let cap: serde_json::Value = serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        let perm = cap["permissions"].as_array().unwrap().iter()
+            .find(|p| p["identifier"] == "opener:allow-open-url")
+            .expect("opener:allow-open-url, with its URL scope");
+        let allowed: std::collections::BTreeSet<String> = perm["allow"].as_array().unwrap().iter()
+            .map(|e| e["url"].as_str().unwrap().to_string())
+            .collect();
+        let urls = ui_urls();
+        assert!(!urls.is_empty(), "app.js's *_URL constants weren't found");
+        assert_eq!(allowed, urls);
+        for url in &urls {
+            assert!(url.starts_with("https://"), "{url}");
+            assert!(!url.contains(['*', '?', '[']), "{url}: scope entries are globs; keep them literal");
+        }
+    }
+
     #[test]
     fn csp_frames_exactly_the_news_origin() {
         let csp = conf()["app"]["security"]["csp"].as_str().unwrap().to_string();
