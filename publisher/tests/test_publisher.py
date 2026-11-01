@@ -149,8 +149,9 @@ def test_publish_uploads_missing_blobs_then_manifest_then_pointer_last(tmp_path,
     stats = release.publish(store, remote, "1.0.0", log=lambda *_: None)
     assert stats["uploaded"] == 3
     assert remote.order[-1] == channel_key("stable")
-    assert remote.order[-3:-1] == [manifest_key("1.0.0"), manifest_key("1.0.0") + ".sig"]
-    assert all(k.startswith("blobs/") for k in remote.order[:-3])
+    assert remote.order[-4:-1] == [manifest_key("1.0.0"), manifest_key("1.0.0") + ".sig",
+                                   "stats/markers.json"]
+    assert all(k.startswith("blobs/") for k in remote.order[:-4])
     assert release.verify(remote, "stable", key[1], deep=True, log=lambda *_: None) == []
 
 

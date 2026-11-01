@@ -319,5 +319,12 @@ footer p + p { margin-top: 8px; }
 .page .eyebrow a { color: var(--stone); text-decoration: none; }
 .page .updated { margin-top: 36px; color: var(--stone); font-size: 0.85rem; }
 
+/* Download counts (/stats/, #130), rendered by worker/stats.js. */
+.stats table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 1rem;
+               font-variant-numeric: tabular-nums; }
+.stats th { text-align: left; color: var(--stone); font-weight: 600; font-size: 0.85rem; }
+.stats th, .stats td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--slate); }
+.stats .n { text-align: right; padding-right: 0; }
+
 /* 404 */
 .lost .hero-copy p { max-width: var(--measure); }

@@ -50,6 +50,7 @@ manifests/<version>.json.sig         base64 ed25519 signature over those bytes
 blobs/<sha[0:2]>/<sha>.zst           file content, one zstd frame
 blobs/<sha[0:2]>/<sha>               file content, raw (already-compressed data)
 launcher/                            launcher installers (and later, self-update feed)
+stats/markers.json                   each release's game-executable blob, for download counts (#130)
 ```
 
 `<sha>` is the lowercase hex SHA-256 of the **decoded** file content. The encoding is part of

@@ -73,10 +73,10 @@ def content_type(key: str) -> str:
     return CONTENT_TYPES.get(Path(key).suffix.lower(), "application/octet-stream")
 
 
-# Keys that change in place: game channel pointers and manifests, and the launcher's update
-# feed (#54). Everything else (blobs, versioned installers + .sig, hashed site files) never
+# Keys that change in place: game channel pointers and manifests, the launcher's update
+# feed (#54), and the download-count markers (#130). Everything else (blobs, versioned installers + .sig, hashed site files) never
 # changes, so caches may keep it forever.
-MUTABLE = ("channels/", "manifests/", "launcher/latest.json")
+MUTABLE = ("channels/", "manifests/", "launcher/latest.json", "stats/")
 
 
 def cache_control(key: str) -> str:

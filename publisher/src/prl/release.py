@@ -20,7 +20,7 @@ from pathlib import Path
 
 import zstandard
 
-from . import config, gitrepo, lfs, sign
+from . import config, gitrepo, lfs, sign, stats
 from .manifest import FileEntry, Manifest, blob_key, channel_key, channel_pointer, manifest_key
 from .store import LocalStore, Store
 
@@ -183,12 +183,14 @@ def check_not_taken(dst: Store, data: bytes) -> Manifest:
 
 
 def finalize(dst: Store, data: bytes, signature: bytes, log=print) -> None:
-    """Manifest + sig, then the channel pointer LAST, so a client never sees a pointer to
-    a release that isn't fully uploaded. Refuses to overwrite a different published version."""
+    """Manifest + sig (+ its download-count marker, #130), then the channel pointer LAST, so a
+    client never sees a pointer to a release that isn't fully uploaded. Refuses to overwrite a
+    different published version."""
     manifest = check_not_taken(dst, data)
     mkey = manifest_key(manifest.version)
     dst.put_bytes(mkey, data)
     dst.put_bytes(mkey + ".sig", signature)
+    stats.record(dst, manifest, log=log)
     dst.put_bytes(channel_key(manifest.channel),
                   channel_pointer(manifest.channel, manifest.version, data))
     log(f"[publish] {manifest.channel} -> {manifest.version}")
