@@ -10,6 +10,7 @@
       "identifier": "opener:allow-open-url",
       "allow": [
         { "url": "https://www.gog.com/en/game/wing_commander_privateer" },
+        { "url": "https://store.steampowered.com/app/2008760/" },
         { "url": "https://privateer-reimagined.com/privacy/" },
         { "url": "https://discord.gg/9Vhm4tdymY" }
       ]

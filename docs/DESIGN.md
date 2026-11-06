@@ -127,14 +127,21 @@ The original assets ship, so the launcher installs only for players who own the 
 1. **Find candidates:**
    - GOG on Windows: `HKLM\SOFTWARE\(WOW6432Node\)GOG.com\Games\*` (`gameName`, `path`).
    - GOG on macOS: `/Applications/Wing Commander*Privateer*.app/Contents/Resources/game`.
-   - Steam: `SteamPath` (registry) → `steamapps/libraryfolders.vdf` → each library's
-     `appmanifest_*.acf` whose `name` mentions Privateer.
+   - Steam (#149): `SteamPath`/`InstallPath` (registry; on macOS `~/Library/Application Support/Steam`)
+     → `steamapps/libraryfolders.vdf` → each library's `appmanifest_*.acf` for appid **2008760**
+     first, then any whose `name` mentions Privateer (not *Privateer 2*) →
+     `steamapps/common/<installdir>`. Paths are compared ignoring case and `/` vs `\`: the
+     registry says `c:/program files (x86)/steam` for the `C:\Program Files (x86)\Steam` the vdf lists.
    - Common folders: `C:\GOG Games\*Privateer*`, `C:\Program Files (x86)\GOG Galaxy\Games\*Privateer*`.
    - Or a folder the player picks.
 2. **Accept a folder only if it holds real Privateer data**, i.e. a file named `GAME.GOG`,
    `PRIV.EXE`, `PRCD.EXE` or `PRIV.TRE` within a few levels. In the GOG release `PRIV.TRE` sits
    inside the `GAME.GOG` disc image, and `PRIV.EXE` boots `PRCD.EXE`. Matching files rather
-   than names also rules out *Privateer 2: The Darkening*.
+   than names also rules out *Privateer 2: The Darkening*. Steam's DOSBox release has
+   `PRIV.EXE` and `PRCD.EXE` at its root (the disc is `GAME.bin`), so the same markers prove it.
+3. **More than one copy** (GOG and Steam): GOG is the default, as it always was; the launcher
+   names the storefront in use and offers "Use the Steam copy instead". A folder the player
+   picks keeps its storefront when it's one the launcher found itself.
 
 The verified path is remembered and re-checked at each launch. This is a good-faith gate, not
 DRM: it keeps the honest path honest and shows we expect players to own the original.

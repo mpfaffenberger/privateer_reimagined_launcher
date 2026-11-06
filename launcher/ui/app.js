@@ -5,6 +5,7 @@ const { open } = window.__TAURI__.dialog;
 const { openUrl } = window.__TAURI__.opener;
 
 const GOG_URL = "https://www.gog.com/en/game/wing_commander_privateer";
+const STEAM_URL = "https://store.steampowered.com/app/2008760/";   // #149
 const PRIVACY_URL = "https://privateer-reimagined.com/privacy/";   // #61
 const DISCORD_URL = "https://discord.gg/9Vhm4tdymY";   // #131: the invite the website uses
 const $ = (id) => document.getElementById(id);
@@ -62,21 +63,35 @@ function render() {
   else primary.textContent = "Play";
 }
 
-function renderOwnership(found) {
+const storeName = (copy) => STORE_NAMES[copy.store] || copy.store;
+
+// The owner card: the copy in use and where it's from, and a switch to each other copy found,
+// e.g. Steam when GOG is in use (#149). `copies` is get_status's or set_privateer_folder's answer.
+function renderOwnership({ owned: found, others = [] }) {
   owned = !!found;
   $("owner-actions").hidden = owned;
   if (found) {
-    $("owner-status").innerHTML = "";
     const ok = document.createElement("span");
     ok.className = "good";
-    ok.textContent = `Found via ${STORE_NAMES[found.store] || found.store}: `;
-    $("owner-status").append(ok, document.createTextNode(found.path));
+    ok.textContent = `Found via ${storeName(found)}: `;
+    $("owner-status").replaceChildren(ok, document.createTextNode(found.path));
   } else {
     $("owner-status").textContent =
       "We couldn't find your copy. Privateer Reimagined needs Wing Commander: Privateer " +
       "from GOG or Steam. If it's installed somewhere unusual, choose its folder.";
   }
+  $("owner-others").hidden = !others.length;   // the backend sends none without a copy in use
+  $("owner-others").replaceChildren(...others.map(otherCopyButton));
   render();
+}
+
+function otherCopyButton(copy) {
+  const button = document.createElement("button");
+  button.className = "link";
+  button.textContent = `Use the ${storeName(copy)} copy instead`;
+  button.title = copy.path;
+  button.addEventListener("click", () => usePrivateer(copy.path));
+  return button;
 }
 
 async function checkUpdate(repair = false) {
@@ -146,16 +161,19 @@ async function verifyClicked() {
   if (update && !update.up_to_date) await installOrUpdate(true);
 }
 
-async function browsePrivateer() {
-  const dir = await open({ directory: true, title: "Choose your Wing Commander: Privateer folder" });
-  if (!dir) return;
+async function usePrivateer(path) {
   try {
-    renderOwnership(await invoke("set_privateer_folder", { path: dir }));
+    renderOwnership(await invoke("set_privateer_folder", { path }));
     showError(null);
     if (!update) await checkUpdate();
   } catch (e) {
     showError(String(e));
   }
+}
+
+async function browsePrivateer() {
+  const dir = await open({ directory: true, title: "Choose your Wing Commander: Privateer folder" });
+  if (dir) await usePrivateer(dir);
 }
 
 async function changeInstallDir() {
@@ -281,6 +299,7 @@ async function main() {
   $("verify").addEventListener("click", verifyClicked);
   $("browse-privateer").addEventListener("click", browsePrivateer);
   $("get-gog").addEventListener("click", () => openUrl(GOG_URL));
+  $("get-steam").addEventListener("click", () => openUrl(STEAM_URL));
   $("privacy").addEventListener("click", () => openUrl(PRIVACY_URL));
   $("discord").addEventListener("click", () => openUrl(DISCORD_URL));
   $("change-dir").addEventListener("click", changeInstallDir);
@@ -296,7 +315,7 @@ async function main() {
   installedVersion = status.installed_version;
   $("install-dir").textContent = status.install_dir;
   $("footer").title = `Update store: ${status.cdn}`;   // for testers (PRL_CDN); players don't need it
-  renderOwnership(status.owned);
+  renderOwnership(status);
   if (status.owned) await checkGameNow();
 }
 
