@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use prl_core::install::{sha256_hex, Installer, Mode, Progress, Release};
-use prl_core::ownership::{self, Found, Storefront};
+use prl_core::ownership::{self, Found};
 use prl_core::source::Source;
 use serde::{Deserialize, Serialize};
 use tauri::webview::NewWindowResponse;
@@ -71,6 +71,25 @@ impl AppState {
         self.config.lock().unwrap().privateer = Some(found.clone());
         let _ = self.save();
     }
+
+    /// The copy in use, and every other copy found, so a player with both GOG and Steam can
+    /// switch (#149).
+    fn copies(&self) -> Copies {
+        let owned = self.ownership();
+        let others = ownership::detect_all()
+            .into_iter()
+            .filter(|f| owned.as_ref().is_some_and(|o| !ownership::same_folder(&o.path, &f.path)))
+            .collect();
+        Copies { owned, others }
+    }
+}
+
+/// What the owner card shows (#149).
+#[derive(Serialize)]
+struct Copies {
+    owned: Option<Found>,
+    /// Other copies found, preferred first; choosing one is `set_privateer_folder(path)`.
+    others: Vec<Found>,
 }
 
 fn cdn() -> String {
@@ -105,7 +124,8 @@ fn begin(state: &AppState) -> Result<BusyGuard<'_>, String> {
 
 #[derive(Serialize)]
 struct Status {
-    owned: Option<Found>,
+    #[serde(flatten)]
+    copies: Copies,
     install_dir: PathBuf,
     installed_version: Option<String>,
     cdn: String,
@@ -114,7 +134,7 @@ struct Status {
 #[tauri::command]
 async fn get_status(state: State<'_, AppState>) -> Result<Status, String> {
     Ok(Status {
-        owned: state.ownership(),
+        copies: state.copies(),
         install_dir: state.install_dir(),
         installed_version: state.installer().installed().map(|m| m.version),
         cdn: cdn(),
@@ -122,12 +142,12 @@ async fn get_status(state: State<'_, AppState>) -> Result<Status, String> {
 }
 
 #[tauri::command]
-async fn set_privateer_folder(path: String, state: State<'_, AppState>) -> Result<Found, String> {
-    let found = ownership::validate(Storefront::Folder, &PathBuf::from(&path)).ok_or_else(|| {
+async fn set_privateer_folder(path: String, state: State<'_, AppState>) -> Result<Copies, String> {
+    let found = ownership::identify(&PathBuf::from(&path)).ok_or_else(|| {
         "That folder doesn't contain Wing Commander: Privateer (looked for GAME.GOG, PRIV.TRE, PRIV.EXE or PRCD.EXE).".to_string()
     })?;
     state.remember(&found);
-    Ok(found)
+    Ok(state.copies())
 }
 
 #[tauri::command]
@@ -435,6 +455,18 @@ mod tests {
         assert_eq!(updater["endpoints"], serde_json::json!(["https://cdn.privateer-reimagined.com/launcher/latest.json"]));
         assert_eq!(updater["windows"]["installMode"], "passive");
         assert_eq!(conf()["bundle"]["createUpdaterArtifacts"], true, "else no .sig, and launchers refuse the update");
+    }
+
+    /// ui/app.js reads `owned` and `others` straight off get_status and set_privateer_folder.
+    #[test]
+    fn status_carries_the_copies_at_the_top_level() {
+        let steam = Found { store: ownership::Storefront::Steam, path: "S".into(), marker: "S/PRIV.EXE".into() };
+        let status = Status { copies: Copies { owned: None, others: vec![steam] }, install_dir: "I".into(),
+                              installed_version: None, cdn: "C".into() };
+        let json = serde_json::to_value(status).unwrap();
+        assert_eq!(json["owned"], serde_json::Value::Null);
+        assert_eq!(json["others"][0]["store"], "steam");
+        assert_eq!(json["install_dir"], "I");
     }
 
     #[test]

@@ -3,9 +3,11 @@
 //! Registry entries, Steam manifests and folder names only *suggest* candidates. A folder
 //! is accepted only if it contains real Privateer data: the GOG release keeps `PRIV.TRE`
 //! inside the `GAME.GOG` disc image and boots `PRIV.EXE` -> `PRCD.EXE`. Matching those
-//! files (not names) also rules out *Privateer 2: The Darkening*.
+//! files (not names) also rules out *Privateer 2: The Darkening*. Steam's release (appid
+//! [`STEAM_APPID`]) is a DOSBox install with `PRIV.EXE` and `PRCD.EXE` at its root and the disc
+//! as `GAME.bin`, so the same markers prove it.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -16,6 +18,8 @@ pub const MARKERS: &[&str] = &["GAME.GOG", "PRIV.TRE", "PRIV.EXE", "PRCD.EXE"];
 const MAX_DEPTH: usize = 4;
 /// Upper bound on directory entries inspected per candidate, so picking `C:\` is cheap.
 const MAX_ENTRIES: usize = 20_000;
+/// *Wing Commander™: Privateer* on Steam (#149).
+pub const STEAM_APPID: &str = "2008760";
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -64,29 +68,64 @@ pub fn validate(store: Storefront, dir: &Path) -> Option<Found> {
     find_marker(dir).map(|marker| Found { store, path: dir.to_path_buf(), marker })
 }
 
+/// A name that may be Privateer: it says so, and isn't *Privateer 2: The Darkening*. Letters
+/// and digits only, so `Wing Commander™: Privateer` and `Wing Commander ® Privateer ™` match.
 fn mentions_privateer(s: &str) -> bool {
-    s.to_ascii_lowercase().contains("privateer")
+    let squashed: String = s.chars().filter(char::is_ascii_alphanumeric).collect::<String>().to_ascii_lowercase();
+    squashed.contains("privateer") && !squashed.contains("privateer2") && !squashed.contains("darkening")
 }
 
-/// Steam: `<root>/steamapps/libraryfolders.vdf` -> libraries -> `appmanifest_*.acf` whose
-/// name mentions Privateer -> `<library>/steamapps/common/<installdir>`.
-pub fn steam_candidates(steam_root: &Path) -> Vec<PathBuf> {
-    let mut libraries = vec![steam_root.to_path_buf()];
+/// A path's identity, ignoring case and separators: Steam's registry says
+/// `c:/program files (x86)/steam` where `libraryfolders.vdf` says `C:\Program Files (x86)\Steam`.
+fn path_key(p: &Path) -> String {
+    p.to_string_lossy().replace('\\', "/").trim_end_matches('/').to_ascii_lowercase()
+}
+
+/// Whether two paths name the same folder (see [`path_key`]).
+pub fn same_folder(a: &Path, b: &Path) -> bool {
+    path_key(a) == path_key(b)
+}
+
+/// Keep the first of each folder named more than once.
+fn dedup_folders<T>(items: &mut Vec<T>, path: impl Fn(&T) -> &Path) {
+    let mut seen = HashSet::new();
+    items.retain(|item| seen.insert(path_key(path(item))));
+}
+
+/// Steam's libraries: those `<root>/steamapps/libraryfolders.vdf` lists, then the root itself.
+/// Steam lists the root as library "0" in its canonical spelling, which is the one kept.
+fn steam_libraries(steam_root: &Path) -> Vec<PathBuf> {
+    let mut libraries = Vec::new();
     if let Ok(text) = std::fs::read_to_string(steam_root.join("steamapps").join("libraryfolders.vdf")) {
-        let doc = vdf::parse(&text);
-        if let Some(folders) = doc.get("libraryfolders") {
+        if let Some(folders) = vdf::parse(&text).get("libraryfolders") {
             for (_, lib) in folders.entries() {
                 // Newer format: { "path" "..." }; old format: "1" "D:\\SteamLibrary".
-                let path = lib.get("path").and_then(vdf::Value::str).or_else(|| lib.str());
-                if let Some(p) = path {
+                if let Some(p) = lib.get("path").and_then(vdf::Value::str).or_else(|| lib.str()) {
                     libraries.push(PathBuf::from(p));
                 }
             }
         }
     }
-    libraries.dedup();
-    let mut out = Vec::new();
-    for lib in libraries {
+    libraries.push(steam_root.to_path_buf());
+    dedup_folders(&mut libraries, |p| p);
+    libraries
+}
+
+/// From an `appmanifest_*.acf`: `(is it appid STEAM_APPID, installdir)`, if it may be Privateer.
+fn steam_app(manifest: &str) -> Option<(bool, String)> {
+    let doc = vdf::parse(manifest);
+    let app = doc.get("AppState")?;
+    let field = |key| app.get(key).and_then(vdf::Value::str);
+    let installdir = field("installdir").filter(|d| !d.is_empty())?;
+    let by_appid = field("appid") == Some(STEAM_APPID);
+    (by_appid || mentions_privateer(field("name").unwrap_or_default())).then(|| (by_appid, installdir.to_string()))
+}
+
+/// Steam: each library's `appmanifest_*.acf` for appid [`STEAM_APPID`] (first) or a name that
+/// mentions Privateer -> `<library>/steamapps/common/<installdir>`.
+pub fn steam_candidates(steam_root: &Path) -> Vec<PathBuf> {
+    let mut found: Vec<(bool, PathBuf)> = Vec::new();
+    for lib in steam_libraries(steam_root) {
         let apps = lib.join("steamapps");
         let Ok(entries) = std::fs::read_dir(&apps) else { continue };
         for entry in entries.flatten() {
@@ -95,15 +134,13 @@ pub fn steam_candidates(steam_root: &Path) -> Vec<PathBuf> {
                 continue;
             }
             let Ok(text) = std::fs::read_to_string(entry.path()) else { continue };
-            let doc = vdf::parse(&text);
-            let Some(app) = doc.get("AppState") else { continue };
-            let title = app.get("name").and_then(vdf::Value::str).unwrap_or_default();
-            if let (true, Some(dir)) = (mentions_privateer(title), app.get("installdir").and_then(vdf::Value::str)) {
-                out.push(apps.join("common").join(dir));
+            if let Some((by_appid, dir)) = steam_app(&text) {
+                found.push((by_appid, apps.join("common").join(dir)));
             }
         }
     }
-    out
+    found.sort_by_key(|(by_appid, _)| !by_appid); // stable: the appid's install first
+    found.into_iter().map(|(_, path)| path).collect()
 }
 
 /// Sub-folders of `parent` whose name mentions Privateer (GOG default install roots).
@@ -156,9 +193,9 @@ fn steam_roots() -> Vec<PathBuf> {
     out
 }
 
-#[cfg(not(windows))]
-fn steam_roots() -> Vec<PathBuf> {
-    let home = std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+/// Steam's default roots in a home folder: macOS, then Linux.
+#[cfg(any(not(windows), test))]
+fn home_steam_roots(home: &Path) -> Vec<PathBuf> {
     vec![
         home.join("Library/Application Support/Steam"),
         home.join(".steam/steam"),
@@ -166,7 +203,13 @@ fn steam_roots() -> Vec<PathBuf> {
     ]
 }
 
-/// Every place Privateer might be, most specific first. Not yet validated.
+#[cfg(not(windows))]
+fn steam_roots() -> Vec<PathBuf> {
+    home_steam_roots(&std::env::var_os("HOME").map(PathBuf::from).unwrap_or_default())
+}
+
+/// Every place Privateer might be, in order of preference: GOG first (what the launcher has
+/// always picked, so an existing player's choice never moves), then Steam. Not yet validated.
 pub fn candidates() -> Vec<(Storefront, PathBuf)> {
     let mut out: Vec<(Storefront, PathBuf)> = Vec::new();
     #[cfg(windows)]
@@ -183,14 +226,30 @@ pub fn candidates() -> Vec<(Storefront, PathBuf)> {
     for root in steam_roots() {
         out.extend(steam_candidates(&root).into_iter().map(|p| (Storefront::Steam, p)));
     }
-    let mut seen = std::collections::HashSet::new();
-    out.retain(|(_, p)| seen.insert(p.to_string_lossy().to_ascii_lowercase()));
+    dedup_folders(&mut out, |(_, p)| p);
     out
 }
 
-/// The first candidate that really holds Privateer data.
+fn validated((store, path): (Storefront, PathBuf)) -> Option<Found> {
+    validate(store, &path)
+}
+
+/// The preferred candidate that really holds Privateer data.
 pub fn detect() -> Option<Found> {
-    candidates().into_iter().find_map(|(store, path)| validate(store, &path))
+    candidates().into_iter().find_map(validated)
+}
+
+/// Every candidate that really holds Privateer data, preferred first: a player with both a GOG
+/// and a Steam copy can choose.
+pub fn detect_all() -> Vec<Found> {
+    candidates().into_iter().filter_map(validated).collect()
+}
+
+/// A folder the player chose. One the launcher also found by itself keeps its storefront
+/// (choosing the Steam folder still says "Steam"); any other is [`Storefront::Folder`].
+pub fn identify(dir: &Path) -> Option<Found> {
+    let store = candidates().into_iter().find(|(_, p)| same_folder(p, dir)).map_or(Storefront::Folder, |(s, _)| s);
+    validate(store, dir)
 }
 
 #[cfg(test)]
@@ -266,5 +325,103 @@ mod tests {
         assert_eq!(got, vec![lib2.join("steamapps").join("common").join("WCP")]);
         touch(&got[0].join("PRIV.EXE"));
         assert_eq!(validate(Storefront::Steam, &got[0]).unwrap().store, Storefront::Steam);
+    }
+
+    // Copies of the files Steam wrote on Mike's PC (#149), the owner's SteamID blanked out.
+    const STEAM_MANIFEST: &str = include_str!("../tests/fixtures/steam/appmanifest_2008760.acf");
+    const OTHER_MANIFEST: &str = include_str!("../tests/fixtures/steam/appmanifest_228980.acf");
+    const LIBRARY_FOLDERS: &str = include_str!("../tests/fixtures/steam/libraryfolders.vdf");
+
+    /// A path as `libraryfolders.vdf` writes it: backslashes doubled.
+    fn vdf_path(p: &Path) -> String {
+        p.to_string_lossy().replace('\\', "\\\\")
+    }
+
+    /// A Steam root and a second library, shaped like the real install (#149): Privateer in the
+    /// root library, a DOSBox layout with the disc as `GAME.bin`. Returns the game folder.
+    fn fake_steam(steam: &Path, library: &Path) -> PathBuf {
+        let apps = steam.join("steamapps");
+        let folders = LIBRARY_FOLDERS.replace("{STEAM}", &vdf_path(steam)).replace("{LIBRARY}", &vdf_path(library));
+        fs::create_dir_all(&apps).unwrap();
+        fs::write(apps.join("libraryfolders.vdf"), folders).unwrap();
+        fs::write(apps.join("appmanifest_2008760.acf"), STEAM_MANIFEST).unwrap();
+        touch(&library.join("steamapps").join("common").join("Steamworks Shared").join("_CommonRedist").join("setup.exe"));
+        fs::write(library.join("steamapps").join("appmanifest_228980.acf"), OTHER_MANIFEST).unwrap();
+        let game = apps.join("common").join("Wing Commander Privateer");
+        for file in ["GAME.bin", "PRIV.EXE", "PRCD.EXE", "PRIV.CFG", "INSTALL.EXE", "dosboxPRIV.conf",
+                     "dosboxPRIV_single.conf", "DOSBOX/DOSBox.exe", "DOSBOX/Wing Commander Privateer.exe",
+                     "Extras/Wing_Commander_Privateer_Manual.pdf", "SteamInput/steam_input_manifest.vdf"] {
+            touch(&game.join(file));
+        }
+        game
+    }
+
+    #[test]
+    fn steam_dosbox_install_is_found_by_appid() {
+        let t = tempfile::tempdir().unwrap();
+        let steam = t.path().join("Program Files (x86)").join("Steam");
+        let game = fake_steam(&steam, &t.path().join("SteamLibrary"));
+        assert_eq!(steam_app(STEAM_MANIFEST), Some((true, "Wing Commander Privateer".into())));
+        assert_eq!(steam_app(OTHER_MANIFEST), None);
+        assert_eq!(steam_candidates(&steam), vec![game.clone()]);
+        let found = validate(Storefront::Steam, &game).unwrap();
+        assert_eq!(found.store, Storefront::Steam);
+        let marker = found.marker.file_name().unwrap().to_string_lossy().to_string();
+        assert!(marker == "PRIV.EXE" || marker == "PRCD.EXE", "{marker}"); // GAME.bin isn't GAME.GOG
+    }
+
+    /// HKCU's `SteamPath` on Mike's PC is `c:/program files (x86)/steam`: the same copy, found
+    /// once, under the spelling `libraryfolders.vdf` uses.
+    #[cfg(windows)]
+    #[test]
+    fn steam_root_spelled_like_the_registry_finds_the_copy_once() {
+        let t = tempfile::tempdir().unwrap();
+        let steam = t.path().join("Program Files (x86)").join("Steam");
+        let game = fake_steam(&steam, &t.path().join("SteamLibrary"));
+        let registry = PathBuf::from(steam.to_string_lossy().to_ascii_lowercase().replace('\\', "/"));
+        assert_eq!(steam_candidates(&registry), vec![game]);
+    }
+
+    #[test]
+    fn folders_compare_without_case_or_separators() {
+        assert!(same_folder(Path::new(r"C:\Program Files (x86)\Steam\"), Path::new("c:/program files (x86)/steam")));
+        assert!(!same_folder(Path::new("C:/Steam"), Path::new("C:/Steam2")));
+        let mut found = vec![PathBuf::from(r"C:\Steam\a"), PathBuf::from("c:/steam/A/"), PathBuf::from(r"C:\Steam\b")];
+        dedup_folders(&mut found, |p| p);
+        assert_eq!(found, vec![PathBuf::from(r"C:\Steam\a"), PathBuf::from(r"C:\Steam\b")]);
+    }
+
+    #[test]
+    fn names_match_privateer_but_not_privateer_2() {
+        assert!(mentions_privateer("Wing Commander™: Privateer"));
+        assert!(mentions_privateer("Wing Commander ® Privateer ™.app"));
+        assert!(!mentions_privateer("Privateer 2: The Darkening"));
+        assert!(!mentions_privateer("Wing Commander Privateer 2 The Darkening"));
+        let manifest = |id, name, dir| format!(r#""AppState" {{ "appid" "{id}" "name" "{name}" "installdir" "{dir}" }}"#);
+        assert_eq!(steam_app(&manifest("1", "Wing Commander: Privateer", "WCP")), Some((false, "WCP".into())));
+        assert_eq!(steam_app(&manifest("2", "Privateer 2: The Darkening", "P2")), None);
+        assert_eq!(steam_app(&manifest(STEAM_APPID, "", "WCP")), Some((true, "WCP".into()))); // the appid alone
+        assert_eq!(steam_app(&manifest(STEAM_APPID, "Wing Commander: Privateer", "")), None); // nowhere to look
+    }
+
+    #[test]
+    fn the_appid_install_comes_before_name_matches() {
+        let t = tempfile::tempdir().unwrap();
+        let steam = t.path().join("Steam");
+        let game = fake_steam(&steam, &t.path().join("SteamLibrary"));
+        fs::write(steam.join("steamapps").join("appmanifest_1.acf"),
+                  r#""AppState" { "appid" "1" "name" "Privateer Fan Remaster" "installdir" "Remaster" }"#).unwrap();
+        let remaster = steam.join("steamapps").join("common").join("Remaster");
+        assert_eq!(steam_candidates(&steam), vec![game, remaster]);
+    }
+
+    #[test]
+    fn mac_steam_root_is_searched_first() {
+        let home = tempfile::tempdir().unwrap();
+        let roots = home_steam_roots(home.path());
+        let mac = home.path().join("Library").join("Application Support").join("Steam");
+        assert_eq!(roots[0], mac);
+        let game = fake_steam(&mac, &home.path().join("SteamLibrary"));
+        assert_eq!(steam_candidates(&roots[0]), vec![game]);
     }
 }

@@ -1,0 +1,41 @@
+"AppState"
+{
+	"appid"		"2008760"
+	"Universe"		"1"
+	"LauncherPath"		"C:\\Program Files (x86)\\Steam\\steam.exe"
+	"name"		"Wing Commander™: Privateer"
+	"StateFlags"		"4"
+	"installdir"		"Wing Commander Privateer"
+	"lastupdated"		"1793927424"
+	"LastPlayed"		"0"
+	"SizeOnDisk"		"281497847"
+	"StagingSize"		"0"
+	"buildid"		"25685182"
+	"LastOwner"		"76561190000000001"
+	"DownloadType"		"1"
+	"UpdateResult"		"0"
+	"BytesToDownload"		"235038736"
+	"BytesDownloaded"		"235038736"
+	"BytesToStage"		"281497847"
+	"BytesStaged"		"281497847"
+	"TargetBuildID"		"25685182"
+	"AutoUpdateBehavior"		"0"
+	"AllowOtherDownloadsWhileRunning"		"0"
+	"ScheduledAutoUpdate"		"0"
+	"InstalledDepots"
+	{
+		"2008761"
+		{
+			"manifest"		"6423030722512484995"
+			"size"		"281497847"
+		}
+	}
+	"UserConfig"
+	{
+		"language"		"english"
+	}
+	"MountedConfig"
+	{
+		"language"		"english"
+	}
+}

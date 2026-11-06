@@ -62,6 +62,10 @@ the DOM's focus events don't fire in WebView2) and on a one-minute tick, at most
 The UI's own logic has tests: `node --test launcher/ui/app.test.mjs` runs `app.js` in a `vm` with
 its Tauri calls stubbed (no window, no dependencies); the `macos` workflow runs them too.
 
+The owner card says where Privateer was found ("Found via GOG" / "Found via Steam"). With both
+installed, GOG is used and a link offers the Steam copy instead, or the other way round (#149);
+the choice is remembered. Detection rules: `docs/DESIGN.md`, Ownership check.
+
 Settings live in `%APPDATA%\com.privateer-reimagined.launcher\launcher.json` (the
 Privateer folder found, and the install folder). The default install folder is
 `%LOCALAPPDATA%\Privateer Reimagined`.

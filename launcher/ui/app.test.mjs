@@ -12,10 +12,11 @@ function element() {
   const listeners = {};
   return {
     hidden: false, disabled: false, textContent: "", innerHTML: "", title: "", className: "",
-    style: {},
+    style: {}, children: [],
     addEventListener(type, fn) { (listeners[type] ??= []).push(fn); },
     click() { return Promise.all((listeners.click || []).map((fn) => fn())); },
-    append() {},
+    append(...nodes) { this.children.push(...nodes); },
+    replaceChildren(...nodes) { this.children = nodes; },
   };
 }
 
@@ -96,6 +97,45 @@ test("hidden while a check runs, back when it's done", async () => {
 test("hidden when Privateer isn't found", async () => {
   const { $ } = await boot({ get_status: { ...DEFAULTS.get_status, owned: null } });
   assert.equal($("check-now").hidden, true);
+});
+
+// Both storefronts installed (#149): the card names the copy in use and offers the other.
+const GOG = { store: "gog", path: "C:\\GOG\\Privateer" };
+const STEAM = { store: "steam", path: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Wing Commander Privateer" };
+const cardText = ($) => $("owner-status").children.map((n) => n.textContent ?? n).join("");
+
+test("one copy found: it's named, and there's nothing to switch to", async () => {
+  const { $ } = await boot({ get_status: { ...DEFAULTS.get_status, owned: STEAM, others: [] } });
+  assert.equal(cardText($), `Found via Steam: ${STEAM.path}`);
+  assert.equal($("owner-others").hidden, true);
+  assert.deepEqual($("owner-others").children, []);
+});
+
+test("GOG and Steam both found: one click switches to the other copy", async () => {
+  const chosen = [];
+  const { $ } = await boot({
+    get_status: { ...DEFAULTS.get_status, owned: GOG, others: [STEAM] },
+    set_privateer_folder: ({ path }) => { chosen.push(path); return { owned: STEAM, others: [GOG] }; },
+  });
+  assert.equal(cardText($), `Found via GOG: ${GOG.path}`);
+  assert.equal($("owner-others").hidden, false);
+  const [toSteam] = $("owner-others").children;
+  assert.equal(toSteam.textContent, "Use the Steam copy instead");
+  assert.equal(toSteam.title, STEAM.path);
+  await toSteam.click();
+  await settle();
+  assert.deepEqual(chosen, [STEAM.path], "the backend decides, by path");
+  assert.equal(cardText($), `Found via Steam: ${STEAM.path}`);
+  assert.deepEqual($("owner-others").children.map((b) => b.textContent), ["Use the GOG copy instead"]);
+});
+
+test("not found: the card links to both stores", async () => {
+  const { $, opened } = await boot({ get_status: { ...DEFAULTS.get_status, owned: null } });
+  assert.equal($("owner-actions").hidden, false);
+  await $("get-gog").click();
+  await $("get-steam").click();
+  assert.deepEqual(opened, ["https://www.gog.com/en/game/wing_commander_privateer",
+                            "https://store.steampowered.com/app/2008760/"]);
 });
 
 // The footer's links (#61, #131) go to the system browser, and only to the one site each names.
