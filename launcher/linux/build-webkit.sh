@@ -32,11 +32,16 @@ pip install -q meson==1.7.2 ninja==1.11.1.4
 # RHEL 8's WebKitGTK patches, pinned to the AlmaLinux c8 commit that ships 2.54.2.
 rhel=https://git.almalinux.org/rpms/webkit2gtk3/raw/commit/8a20cfc0403f4c85a906a9322aa5c72d32f5ecb0/SOURCES
 
+# These two run inside $(...), where bash ignores set -e: every failure is returned by hand,
+# so a download or checksum failure stops the build instead of building what's there.
 fetch() {  # <url> <sha256>: download into $src once, verify, print the path
   local file
   file=$src/$(basename "$1")
   [[ -f $file ]] || curl -fsSL --retry 3 -o "$file" "$1" || return
-  echo "$2  $file" | sha256sum -c --quiet - >&2 || return
+  if ! echo "$2  $file" | sha256sum -c --quiet - >&2; then
+    rm -f "$file"   # don't keep a bad download for the next run
+    return 1
+  fi
   echo "$file"
 }
 
@@ -44,7 +49,7 @@ unpack() {  # <url> <sha256>: unpack a fresh tree, print its path
   local tarball dir
   tarball=$(fetch "$1" "$2") || return
   dir=${tarball%.tar.xz}
-  { rm -rf "$dir" && tar -xJf "$tarball" -C "$src"; } || return
+  rm -rf "$dir" && tar -xJf "$tarball" -C "$src" || return
   echo "$dir"
 }
 
@@ -100,12 +105,16 @@ for patch in \
   "libxml2 fcf21cccb8db1cbf80b3a53b1254dff2205ea41d492091466c09b82c9f70ed92 2" \
   "icu60 22e9c194a2e68564e928954e9015a686dc7a0025808b32330aca2b419030ef44 2"; do
   read -r name sha fuzz <<<"$patch"
-  patch -d "$webkit" -p1 --forward --quiet --fuzz="$fuzz" <"$(fetch "$rhel/$name.patch" "$sha")"
+  file=$(fetch "$rhel/$name.patch" "$sha")
+  patch -d "$webkit" -p1 --forward --quiet --fuzz="$fuzz" <"$file"
 done
 
 # The launcher shows its own UI and one news page: no media, WebGL, speech, spellcheck,
 # introspection or docs. Fewer features, fewer bundled libraries, a shorter build. And -O2
 # like the distros: CMake's Release default, -O3, only makes the build longer.
+# No bubblewrap sandbox either: the 4.1 API only sandboxes an app that asks for it
+# (webkit_web_context_set_sandbox_enabled), and wry doesn't, so it would never run (nor did it
+# in 0.3.6). Turning it on is an app change, with bwrap on the player's system to handle.
 cmake -S "$webkit" -B "$webkit/build" -G Ninja -DPORT=GTK -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_FLAGS_RELEASE="-O2 -DNDEBUG" -DCMAKE_CXX_FLAGS_RELEASE="-O2 -DNDEBUG" \
   -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
