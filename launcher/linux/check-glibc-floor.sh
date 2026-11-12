@@ -37,11 +37,12 @@ while IFS= read -r -d '' file; do
 
   # Only what the file *requires* (Version References), not what a bundled libc defines.
   # GLIBC_ABI_DT_RELR (packed relocations) has no number but arrived in glibc 2.36.
-  needed=$(objdump -p "$file" | awk '/^Version References:/ { refs = 1 } refs' \
+  dynamic=$(objdump -p "$file") || { echo "::error::cannot inspect ELF $rel"; exit 1; }
+  needed=$(printf '%s\n' "$dynamic" | awk '/^Version References:/ { refs = 1 } refs' \
     | grep -oE 'GLIBC_([0-9]+(\.[0-9]+)+|ABI_DT_RELR)' \
     | sed -e 's/^GLIBC_ABI_DT_RELR$/2.36/' -e 's/^GLIBC_//' | sort -uV || true)
   # e.g. /opt/_internal/sqlite3/lib/libsqlite3.so, a library without a SONAME.
-  for path in $(objdump -p "$file" | awk '$1 == "NEEDED" && $2 ~ /\// { print $2 }'); do
+  for path in $(printf '%s\n' "$dynamic" | awk '$1 == "NEEDED" && $2 ~ /\// { print $2 }'); do
     bad=$((bad + 1))
     echo "::error::$rel needs $path by its path on the build machine"
   done
