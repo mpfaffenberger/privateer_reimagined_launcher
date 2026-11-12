@@ -2,8 +2,9 @@
 
 Each platform has a file people download from the site and a file the updater fetches
 (with its minisign signature beside it). On Windows they're the same NSIS installer; on a
-Mac people get a .dmg and the updater fetches the .app.tar.gz. Every name is versioned and
-immutable. One feed (launcher/latest.json) lists every platform for ONE version.
+Mac people get a .dmg and the updater fetches the .app.tar.gz; on Linux (#163) both are the
+AppImage, one per arch. Every name is versioned and immutable. One feed (launcher/latest.json)
+lists every platform for ONE version.
 """
 
 from __future__ import annotations
@@ -35,6 +36,15 @@ WINDOWS = Platform("windows-x86_64",
 MACOS = Platform("darwin-aarch64",
                  "launcher/PrivateerReimagined-{v}-macos-arm64.dmg",
                  "launcher/PrivateerReimagined-{v}-macos-arm64.app.tar.gz")
+# Linux (#163): the AppImage is what tauri-plugin-updater replaces itself with.
+LINUX = {
+    "x86_64": Platform("linux-x86_64",
+                       "launcher/PrivateerReimagined-{v}-linux-x86_64.AppImage",
+                       "launcher/PrivateerReimagined-{v}-linux-x86_64.AppImage"),
+    "arm64": Platform("linux-aarch64",
+                      "launcher/PrivateerReimagined-{v}-linux-arm64.AppImage",
+                      "launcher/PrivateerReimagined-{v}-linux-arm64.AppImage"),
+}
 
 
 def _check_version(version: str) -> str:
@@ -128,3 +138,11 @@ def upload_macos(store: Store, app_archive: Path, dmg: Path, version: str, notes
                  now: datetime | None = None) -> dict[str, str]:
     """macOS: the .dmg for the site, the signed .app.tar.gz for the updater."""
     return publish(store, MACOS, version, app_archive, dmg, notes=notes, log=log, now=now)
+
+
+def upload_linux(store: Store, appimage: Path, arch: str, version: str, notes: str = "", log=print,
+                 now: datetime | None = None) -> str:
+    """Linux (#163): one signed AppImage per arch (`x86_64` or `arm64`). Returns its SHA-256."""
+    platform = LINUX[arch]
+    return publish(store, platform, version, appimage, notes=notes, log=log, now=now)[
+        platform.download.format(v=_check_version(version))]

@@ -165,6 +165,52 @@ def test_cli_macos(tmp_path):
                   "--to", str(tmp_path / "cdn")])
 
 
+# --- Linux (#163): one signed AppImage per arch, both download and update ---
+
+TAURI_APPIMAGE = {"x86_64": "amd64", "arm64": "aarch64"}   # tauri build's arch in the name
+
+
+def appimage(tmp_path, arch, version="0.3.6", sig="bGludXggc2ln"):
+    path = tmp_path / f"Privateer Reimagined_{version}_{TAURI_APPIMAGE[arch]}.AppImage"
+    path.write_bytes(b"\x7fELF fake AppImage " + arch.encode())
+    if sig is not None:
+        path.with_name(path.name + ".sig").write_text(sig + "\n")
+    return path
+
+
+def test_linux_appimages_join_the_feed_per_arch(tmp_path):
+    store = RecordingStore(tmp_path / "cdn")
+    launcher_dist.upload_installer(store, installer(tmp_path, "0.3.6"), "0.3.6", log=quiet)
+    for arch in ("x86_64", "arm64"):
+        sha = launcher_dist.upload_linux(store, appimage(tmp_path, arch), arch, "0.3.6", log=quiet)
+        key = f"launcher/PrivateerReimagined-0.3.6-linux-{arch}.AppImage"
+        assert store.get(key) == appimage(tmp_path, arch).read_bytes()
+        assert sha == hashlib.sha256(store.get(key)).hexdigest() and store.exists(key + ".sig")
+    platforms = json.loads(store.get("launcher/latest.json"))["platforms"]
+    assert set(platforms) == {"windows-x86_64", "linux-x86_64", "linux-aarch64"}
+    assert platforms["linux-aarch64"] == {
+        "signature": "bGludXggc2ln",
+        "url": "https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-0.3.6-linux-arm64.AppImage"}
+
+
+def test_unsigned_appimage_is_refused_before_anything_is_uploaded(tmp_path):
+    store = RecordingStore(tmp_path / "cdn")
+    with pytest.raises(FileNotFoundError, match="tauri signer sign"):
+        launcher_dist.upload_linux(store, appimage(tmp_path, "x86_64", sig=None), "x86_64", "0.3.6", log=quiet)
+    assert store.writes == []
+
+
+def test_cli_linux(tmp_path):
+    rc = cli.main(["upload-launcher", "--linux-x86_64-appimage", str(appimage(tmp_path, "x86_64")),
+                   "--linux-arm64-appimage", str(appimage(tmp_path, "arm64")),
+                   "--version", "0.3.6", "--to", str(tmp_path / "cdn")])
+    assert rc == 0
+    feed = json.loads((tmp_path / "cdn/launcher/latest.json").read_text())
+    assert set(feed["platforms"]) == {"linux-x86_64", "linux-aarch64"}
+    with pytest.raises(SystemExit):   # nothing to upload
+        cli.main(["upload-launcher", "--version", "0.3.6", "--to", str(tmp_path / "cdn")])
+
+
 def test_cache_headers():
     # #54: the feed changes every release; a cached copy would pin launchers to an old version.
     assert cache_control(launcher_dist.FEED_KEY) == "no-cache"
