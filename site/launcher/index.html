@@ -29,6 +29,17 @@
     <ul>
       <li><time datetime="2026-11-12">12 Nov</time>
         <div>
+          <p><b>Game 0.1.35.</b> Joysticks that crashed the game on Windows work again.</p>
+          <ul class="changes">
+            <li>fixed: on Windows, PXN and similar joystick drivers no longer crash the game at launch or on hot-plug</li>
+            <li>fixed: non-XInput joysticks are read as raw HID, bypassing vendor drivers, and keep their bindings</li>
+            <li>added: a crash guard skips a joystick that closed the game last time, with Try again in OPTIONS &gt; JOYSTICK</li>
+            <li>added: a Turn controller devices off setting in OPTIONS &gt; JOYSTICK, or --no-joystick for one run</li>
+          </ul>
+        </div>
+      </li>
+      <li><time datetime="2026-11-12">12 Nov</time>
+        <div>
           <p><b>Game 0.1.34.</b> Fly with a controller, and on Linux and the Steam Deck.</p>
           <ul class="changes">
             <li>added: full controller support with rebinding, trigger thresholds and Steam Deck defaults, thanks to teamsam and zerogabriel</li>
