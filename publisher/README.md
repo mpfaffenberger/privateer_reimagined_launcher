@@ -65,6 +65,26 @@ local file instead.
 - Versions are immutable: rebuilding one with different contents is refused.
 - `--to` / `--store` also accept a local folder, handy for dry runs and launcher testing.
 
+## Platforms (#66, #162)
+
+`--os` picks the platform a release is for: `windows` (default, channel `stable`), `macos`
+(`stable-macos`), `linux` (x86_64, the Steam Deck; `stable-linux`) or `linux-arm64`
+(`stable-linux-arm64`). A build only goes to its own platform's channel. In `release.toml`, a
+source's `os` is one platform or a list (`os = ["macos", "linux", "linux-arm64"]`); a source
+without `os` is in every release.
+
+## Standalone packages (game #1508)
+
+```bash
+uv run prl package --manifest dist/store/manifests/<version>.json --from r2 --out dist/<name>.tar.gz
+uv run prl upload-file dist/<name>.tar.gz --prefix packages/game --to r2
+```
+
+`package` writes the release a manifest describes as one `.tar.gz` (unpacking into `<name>/`,
+launch target executable), from the blobs already in the store: no game checkout or LFS
+content needed, and every file is checked against the manifest. The game repo's release
+workflow does this for each Linux release.
+
 ## Tests
 
 ```bat

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -50,3 +51,13 @@ def test_caches_without_a_source_mesh_still_ship(shipped):
 def test_the_rest_of_the_release_is_unchanged(shipped):
     assert {"new_privateer.exe", "assets/data/fixers.json"} <= shipped
     assert not any(p.startswith("assets/speech/flight_by_speaker/") for p in shipped)
+
+
+@pytest.mark.parametrize("platform", ["macos", "linux", "linux-arm64"])
+def test_every_unix_platform_ships_its_binary_and_the_same_assets(shipped, platform):
+    """#162: both Linux arches ship like macOS: build/new_privateer plus Windows' assets."""
+    (Path(os.environ["GAME_REPO"]) / "build" / "new_privateer").write_bytes(b"x")   # repo from `shipped`
+    cfg = config.load(RELEASE_TOML, platform)
+    assert cfg.launch == {platform: "new_privateer"}
+    files = {dest for _, dest in config.collect(cfg)}
+    assert files == (shipped - {"new_privateer.exe"}) | {"new_privateer"}

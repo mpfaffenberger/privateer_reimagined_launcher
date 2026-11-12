@@ -47,7 +47,7 @@ buttons and every rule stay compiled into the launcher.
 A launcher left open re-checks when the player comes back to the window (Tauri's `tauri://focus`;
 the DOM's focus events don't fire in WebView2) and on a one-minute tick, at most every ten minutes:
 
-- **Game releases:** `release_hint` reads only this OS's channel pointer and returns its manifest
+- **Game releases:** `release_hint` reads only this platform's channel pointer and returns its manifest
   hash. Only when that changes (or after an offline start) does the full signed `check_update` run.
   The hint takes no lock and is trusted for nothing: installs come from the verified release.
   No background check runs while an install or verify is.
@@ -68,7 +68,31 @@ the choice is remembered. Detection rules: `docs/DESIGN.md`, Ownership check.
 
 Settings live in `%APPDATA%\com.privateer-reimagined.launcher\launcher.json` (the
 Privateer folder found, and the install folder). The default install folder is
-`%LOCALAPPDATA%\Privateer Reimagined`.
+`%LOCALAPPDATA%\Privateer Reimagined`; on Linux it's the XDG data dir,
+`$XDG_DATA_HOME/Privateer Reimagined` or else `~/.local/share/Privateer Reimagined` (settings in
+`~/.config/com.privateer-reimagined.launcher/`).
+
+## Linux and the Steam Deck (#162)
+
+The `linux` workflow builds an AppImage and a `.deb` on x86_64 and on ARM64 (artifact
+`privateer-launcher-linux-<arch>-<sha>`). A launcher installs the game build for the CPU it was
+built for: x86_64 reads `stable-linux`, ARM64 `stable-linux-arm64` (`prl_core::format::PLATFORM`),
+and it refuses a release with no launch entry for its platform, so a Windows, macOS or
+other-arch game is never installed. To build one locally (Tauri's Linux prerequisites installed):
+`npx tauri build --bundles appimage,deb --config '{"bundle":{"createUpdaterArtifacts":false}}'`.
+
+**Steam Deck** (x86_64, SteamOS): in Desktop Mode, mark the AppImage executable (Properties >
+Permissions) and run it; to start it from Game Mode, add it as a non-Steam game. Caveats:
+
+- The AppImage needs FUSE 2, which SteamOS ships. Where it's missing, run it with
+  `--appimage-extract-and-run`.
+- It's built on Ubuntu 24.04 (`ubuntu-latest`), so it needs glibc 2.39 or newer, as does the
+  game it installs.
+- If the window stays blank (WebKitGTK and some GPU drivers), start it with
+  `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
+- Started from Game Mode, the game it launches runs inside Steam's session as the launcher's
+  child; controller support is game issue #1509.
+- Self-updates: until a Linux launcher is published to the update feed, it offers none.
 
 ## Build the installer
 

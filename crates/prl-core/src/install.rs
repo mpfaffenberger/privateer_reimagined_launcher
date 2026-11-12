@@ -219,10 +219,10 @@ impl Installer {
         if manifest.channel != channel || manifest.version != pointer.version {
             return untrusted("manifest channel/version disagree with the pointer");
         }
-        // A release built for another OS (published to the wrong channel by mistake) would
+        // A release built for another platform (published to the wrong channel by mistake) would
         // replace a working install with files this computer can't run: refuse it (#66).
         if manifest.launch_target().is_none() {
-            return Err(Error::Format(format!("release {} isn't built for {}", manifest.version, format::OS)));
+            return Err(Error::Format(format!("release {} isn't built for {}", manifest.version, format::PLATFORM)));
         }
         Ok(Release { pointer, manifest, manifest_bytes: bytes })
     }
@@ -394,7 +394,7 @@ impl Installer {
     /// Start the installed game with the install folder as its working directory.
     pub fn launch(&self) -> Result<std::process::Child> {
         let manifest = self.installed().ok_or_else(|| Error::Format("the game is not installed".into()))?;
-        let exe = manifest.launch_target().ok_or_else(|| Error::Format("this release has no launcher entry for this OS".into()))?;
+        let exe = manifest.launch_target().ok_or_else(|| Error::Format("this release has no launcher entry for this platform".into()))?;
         let path = format::install_path(&self.root, exe);
         make_executable(&path)?;
         std::process::Command::new(&path).current_dir(&self.root).spawn().map_err(io_err(&path))

@@ -69,29 +69,41 @@ impl Manifest {
             }
         }
         for exe in m.launch.values() {
-            check_path(exe)?;   // every OS's entry, not just this one's (#66)
+            check_path(exe)?;   // every platform's entry, not just this one's (#66)
         }
         Ok(m)
     }
 
     pub fn launch_target(&self) -> Option<&str> {
-        self.launch.get(OS).map(String::as_str)
+        self.launch.get(PLATFORM).map(String::as_str)
     }
 }
 
-/// This build's OS, as named in manifests' `launch` map and in platform channel names.
-pub const OS: &str = if cfg!(windows) { "windows" } else if cfg!(target_os = "macos") { "macos" } else { "linux" };
+/// The platform this launcher was built for, as named in manifests' `launch` map and in
+/// platform channel names: its OS, plus the CPU for ARM64 Linux (#162). Linux has two game
+/// builds, and an x86_64 one (the Steam Deck's) can't run on an ARM64 machine or the other
+/// way round, so they're separate platforms. Windows and macOS each ship one build.
+pub const PLATFORM: &str = if cfg!(windows) {
+    "windows"
+} else if cfg!(target_os = "macos") {
+    "macos"
+} else if cfg!(target_arch = "aarch64") {
+    "linux-arm64"
+} else {
+    "linux"
+};
 
-/// The channel this OS reads (#66). A release is one file list, so each OS has its own
-/// channel: Windows keeps the bare name (every installed launcher reads `stable`), others
-/// add their OS (`stable-macos`). The pointer and the signed manifest both name the channel,
-/// so one OS's release can never be installed on another.
+/// The channel this platform reads (#66). A release is one file list, so each platform has
+/// its own channel: Windows keeps the bare name (every installed launcher reads `stable`),
+/// others add their platform (`stable-macos`, `stable-linux`, `stable-linux-arm64`). The
+/// pointer and the signed manifest both name the channel, so one platform's release can never
+/// be installed on another.
 pub fn platform_channel(base: &str) -> String {
-    platform_channel_for(base, OS)
+    platform_channel_for(base, PLATFORM)
 }
 
-fn platform_channel_for(base: &str, os: &str) -> String {
-    if os == "windows" { base.to_string() } else { format!("{base}-{os}") }
+fn platform_channel_for(base: &str, platform: &str) -> String {
+    if platform == "windows" { base.to_string() } else { format!("{base}-{platform}") }
 }
 
 /// Same rules as `publisher/src/prl/paths.py::check`.
@@ -149,25 +161,46 @@ mod tests {
     }
 
     #[test]
-    fn every_os_launch_path_is_checked_not_just_this_ones() {
+    fn every_platform_launch_path_is_checked_not_just_this_ones() {
         assert!(Manifest::parse(with_launch(r#"{"windows":"game.exe","macos":"bin/game"}"#).as_bytes()).is_ok());
-        for evil in [r#"{"macos":"../../bin/sh"}"#, r#"{"linux":"/usr/bin/x"}"#, r#"{"windows":"C:/x.exe"}"#] {
+        for evil in [r#"{"macos":"../../bin/sh"}"#, r#"{"linux":"/usr/bin/x"}"#, r#"{"windows":"C:/x.exe"}"#,
+                     r#"{"linux-arm64":"../x"}"#] {
             assert!(Manifest::parse(with_launch(evil).as_bytes()).is_err(), "{evil} must be refused on every OS");
         }
     }
 
     #[test]
-    fn each_os_reads_its_own_channel_and_windows_keeps_the_old_name() {
+    fn each_platform_reads_its_own_channel_and_windows_keeps_the_old_name() {
         assert_eq!(platform_channel_for("stable", "windows"), "stable");   // launchers 0.1-0.3 read this
         assert_eq!(platform_channel_for("stable", "macos"), "stable-macos");
         assert_eq!(platform_channel_for("beta", "linux"), "beta-linux");
-        assert_eq!(platform_channel("stable"), platform_channel_for("stable", OS));
+        assert_eq!(platform_channel_for("stable", "linux-arm64"), "stable-linux-arm64");
+        assert_eq!(platform_channel("stable"), platform_channel_for("stable", PLATFORM));
     }
 
     #[test]
-    fn launch_target_is_this_oss_entry() {
-        let m = Manifest::parse(with_launch(r#"{"windows":"w.exe","macos":"m","linux":"l"}"#).as_bytes()).unwrap();
-        let want = match OS { "windows" => "w.exe", "macos" => "m", _ => "l" };
+    fn linux_platform_follows_the_cpu() {
+        if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+            assert_eq!(PLATFORM, "linux");   // the Steam Deck
+        }
+        if cfg!(all(target_os = "linux", target_arch = "aarch64")) {
+            assert_eq!(PLATFORM, "linux-arm64");
+        }
+    }
+
+    #[test]
+    fn launch_target_is_this_platforms_entry() {
+        let m = Manifest::parse(with_launch(
+            r#"{"windows":"w.exe","macos":"m","linux":"l","linux-arm64":"a"}"#).as_bytes()).unwrap();
+        let want = match PLATFORM { "windows" => "w.exe", "macos" => "m", "linux-arm64" => "a", _ => "l" };
         assert_eq!(m.launch_target(), Some(want));
+    }
+
+    #[test]
+    fn the_other_linux_arch_is_refused() {
+        // An x86_64 game on an ARM64 launcher (or the reverse) has no launch entry here.
+        let other = if PLATFORM == "linux-arm64" { "linux" } else { "linux-arm64" };
+        let m = Manifest::parse(with_launch(&format!(r#"{{"{other}":"new_privateer"}}"#)).as_bytes()).unwrap();
+        assert_eq!(m.launch_target(), None);
     }
 }

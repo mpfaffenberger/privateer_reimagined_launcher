@@ -1,0 +1,86 @@
+# Linux: Rust + publisher tests and the launcher's AppImage and .deb (#162), on x86_64 (the
+# Steam Deck's arch) and ARM64. Each launcher reads its own arch's game channel
+# (`stable-linux` or `stable-linux-arm64`, prl-core's format::PLATFORM), so the Deck never
+# fetches an ARM64 game build and vice versa.
+#
+# Like macOS, the updater signature is NOT made here: the updater key stays on Mike's
+# machine. On Linux the AppImage itself is what tauri-plugin-updater downloads.
+name: linux
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: linux-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    name: test-and-build (${{ matrix.arch }})
+    strategy:
+      # Each arch reports on its own: an ARM-only failure must not hide the x86_64 result.
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tauri v2's Linux prerequisites (WebKitGTK 4.1 etc.); `file` is used by the AppImage bundler.
+      - name: Linux build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends build-essential file patchelf \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
+
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      # uv also turns on prl-core's e2e test: the real Python publisher publishes for this
+      # arch's platform and the Rust core installs it, so the linux-arm64 contract is proven
+      # on an ARM64 machine.
+      - name: Set up uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+
+      - name: Publisher tests
+        run: uv run --project publisher pytest publisher/tests -q
+
+      - name: Rust tests (prl-core, launcher)
+        run: cargo test -p prl-core -p privateer-launcher
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # NO_STRIP: linuxdeploy's bundled strip can't read Ubuntu 24.04's newer ELF sections.
+      # APPIMAGE_EXTRACT_AND_RUN: the runners have no FUSE for the AppImage tooling itself.
+      - name: Build the unsigned launcher (.AppImage + .deb)
+        working-directory: launcher
+        env:
+          NO_STRIP: "true"
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          npm ci
+          npx tauri build --bundles appimage,deb --config '{"bundle":{"createUpdaterArtifacts":false}}'
+
+      - name: Upload the AppImage + .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: privateer-launcher-linux-${{ matrix.arch }}-${{ github.sha }}
+          path: |
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/deb/*.deb
+          if-no-files-found: error
+          retention-days: 14
