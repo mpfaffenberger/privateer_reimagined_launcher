@@ -182,7 +182,8 @@
           <p><strong>Linux and Steam Deck:</strong> make the AppImage executable (right-click it,
             <strong>Properties</strong>, <strong>Permissions</strong>, or <code>chmod +x</code>) and run it.
             On the Deck, do this in Desktop Mode, then add it to Steam as a non-Steam game to start it
-            from Game Mode.</p>
+            from Game Mode. AppImages need FUSE 2, which SteamOS has; if yours doesn't open, run it
+            with <code>--appimage-extract-and-run</code>.</p>
           <p class="hash">To check your download, its SHA-256 is
             <span>for Windows: <code data-platform="windows">13ebec5f252e5aad51d66094f95e4a46d6e749fada8dfdf1ea05a39c6f1ed017</code></span>
             <span>for Mac: <code data-platform="mac">4fbe8c36ba887a4d5ee205fdcde2cbea04826b1f901355bd4c06553b70d8f454</code></span>
