@@ -86,8 +86,10 @@ Permissions) and run it; to start it from Game Mode, add it as a non-Steam game.
 
 - The AppImage needs FUSE 2, which SteamOS ships. Where it's missing, run it with
   `--appimage-extract-and-run`.
-- It's built on Ubuntu 24.04 (`ubuntu-latest`), so it needs glibc 2.39 or newer, as does the
-  game it installs.
+- An AppImage needs at least the glibc of the system it was built on (`ldd --version` shows
+  the Deck's). CI builds x86_64 on `ubuntu-latest`, which is Ubuntu 26.04 now, newer than
+  SteamOS may have: build the AppImage players get on `ubuntu-24.04` (glibc 2.39), as the
+  game's Linux releases are (#163).
 - If the window stays blank (WebKitGTK and some GPU drivers), start it with
   `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 - Started from Game Mode, the game it launches runs inside Steam's session as the launcher's

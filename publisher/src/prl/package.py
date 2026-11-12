@@ -35,9 +35,11 @@ def checked_content(store: Store, f: FileEntry) -> bytes:
 
 def package(manifest_bytes: bytes, store: Store, out: Path, workers: int = 8, log=print) -> Path:
     """Write the release `manifest_bytes` describes to `out` (`<name>.tar.gz`)."""
-    if not out.name.endswith(SUFFIX) or out.name == SUFFIX:
-        raise ValueError(f"{out.name!r}: the package must be named <name>{SUFFIX}")
     root = out.name[: -len(SUFFIX)]
+    # The root becomes every member's first path segment: `..` would point outside the
+    # folder it's unpacked in, and `.` or nothing would lose the promised top-level folder.
+    if not out.name.endswith(SUFFIX) or root in ("", ".", ".."):
+        raise ValueError(f"{out.name!r}: the package must be named <name>{SUFFIX}")
     manifest = Manifest.from_bytes(manifest_bytes)
     executables = set(manifest.launch.values())
     mtime = int(dt.datetime.strptime(manifest.created_utc, "%Y-%m-%dT%H:%M:%SZ")

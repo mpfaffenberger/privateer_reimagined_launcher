@@ -50,7 +50,7 @@ def test_a_blob_that_does_not_match_the_manifest_is_refused(tmp_path, game):
     assert not out.exists() and not list(tmp_path.glob("*.tmp"))
 
 
-@pytest.mark.parametrize("name", ["game.zip", ".tar.gz", "game.tar"])
+@pytest.mark.parametrize("name", ["game.zip", ".tar.gz", "game.tar", "..tar.gz", "...tar.gz"])
 def test_the_archive_must_be_a_named_tar_gz(tmp_path, game, name):
     _, store, data = built(tmp_path, game)
     with pytest.raises(ValueError, match="must be named"):
