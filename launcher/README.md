@@ -87,14 +87,13 @@ Permissions) and run it; to start it from Game Mode, add it as a non-Steam game.
 - The AppImage needs FUSE 2, which SteamOS ships. Where it's missing, run it with
   `--appimage-extract-and-run`.
 - An AppImage needs at least the glibc of the system it was built on (`ldd --version` shows
-  the Deck's). CI builds x86_64 on `ubuntu-latest`, which is Ubuntu 26.04 now, newer than
-  SteamOS may have: build the AppImage players get on `ubuntu-24.04` (glibc 2.39), as the
-  game's Linux releases are (#163).
+  the Deck's). The x86_64 one is built on Ubuntu 24.04, so it needs glibc 2.39 or newer, like
+  the game's Linux releases (#163).
 - If the window stays blank (WebKitGTK and some GPU drivers), start it with
   `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 - Started from Game Mode, the game it launches runs inside Steam's session as the launcher's
   child; controller support is game issue #1509.
-- Self-updates: until a Linux launcher is published to the update feed, it offers none.
+- It updates itself like the other platforms: the feed has `linux-x86_64` and `linux-aarch64`.
 
 ## Build the installer
 
@@ -126,8 +125,10 @@ against the key compiled into them, run the installer passively and restart.
    ```powershell
    npx tauri signer sign -f "$env:USERPROFILE\.prl\launcher_updater.key" -p "" "<path>\Privateer Reimagined_<v>_aarch64.app.tar.gz"
    ```
-4. From `publisher/`, with the R2 variables set (Windows and/or macOS, same version):
-   `uv run prl upload-launcher --installer <exe> --macos-archive <app.tar.gz> --macos-dmg <dmg> --version <v> --notes "<one line>" --to r2`.
+   **Linux** (#163): the same push runs the `linux` workflow; its two artifacts hold
+   `Privateer Reimagined_<v>_amd64.AppImage` and `..._aarch64.AppImage`. Sign each the same way.
+4. From `publisher/`, with the R2 variables set (any of the platforms, same version):
+   `uv run prl upload-launcher --installer <exe> --macos-archive <app.tar.gz> --macos-dmg <dmg> --linux-x86_64-appimage <amd64.AppImage> --linux-arm64-appimage <aarch64.AppImage> --version <v> --notes "<one line>" --to r2`.
    It uploads each file and its `.sig` (immutable names), then points `latest.json` at them
    last. One feed lists every platform for one version; a newer version never carries another
    platform's older build. It refuses unsigned files and an older version than the feed has.
