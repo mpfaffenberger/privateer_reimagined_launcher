@@ -35,16 +35,16 @@ rhel=https://git.almalinux.org/rpms/webkit2gtk3/raw/commit/8a20cfc0403f4c85a906a
 fetch() {  # <url> <sha256>: download into $src once, verify, print the path
   local file
   file=$src/$(basename "$1")
-  [[ -f $file ]] || curl -fsSL --retry 3 -o "$file" "$1"
-  echo "$2  $file" | sha256sum -c --quiet - >&2
+  [[ -f $file ]] || curl -fsSL --retry 3 -o "$file" "$1" || return
+  echo "$2  $file" | sha256sum -c --quiet - >&2 || return
   echo "$file"
 }
 
 unpack() {  # <url> <sha256>: unpack a fresh tree, print its path
   local tarball dir
-  tarball=$(fetch "$1" "$2")
+  tarball=$(fetch "$1" "$2") || return
   dir=${tarball%.tar.xz}
-  rm -rf "$dir" && tar -xJf "$tarball" -C "$src"
+  { rm -rf "$dir" && tar -xJf "$tarball" -C "$src"; } || return
   echo "$dir"
 }
 
@@ -53,7 +53,7 @@ publish() { cp -a "$stage"/. /; }
 
 meson_build() {  # <url> <sha256> [meson options...]
   local dir
-  dir=$(unpack "$1" "$2")
+  dir=$(unpack "$1" "$2") || return
   shift 2
   meson setup "$dir/build" "$dir" --prefix=/usr --libdir=lib64 --buildtype=release "$@"
   meson compile -C "$dir/build"
