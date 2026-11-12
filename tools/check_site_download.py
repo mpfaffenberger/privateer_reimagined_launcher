@@ -1,6 +1,6 @@
 """Check the website's download buttons against the SHA-256s it prints (#62, #69).
 
-Each button and its hash carry the same data-platform (windows, mac). For every platform this
+Each button and its hash carry the same data-platform (windows, mac, linux, linux_arm64). For every platform this
 downloads what the button links to and compares it with the printed hash, so they can't drift
 apart when a button moves to a new launcher version. Run it after pointing the buttons at new
 files:

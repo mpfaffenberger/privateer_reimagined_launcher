@@ -33,9 +33,12 @@
       <p class="tagline">Trade, fight and smuggle your way across the Gemini Sector. A from-scratch
         reimagining of Origin's 1993 classic, free for anyone who owns the original.</p>
       <div class="get">
-        <a class="button" data-platform="windows" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-Setup-0.3.5-x64.exe">Download for Windows</a>
-        <a class="button" data-platform="mac" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-0.3.5-macos-arm64.dmg">Download for Mac</a>
-        <p class="get-note">Version 0.3.5 for Windows 10 and 11, and for Macs with Apple silicon.
+        <a class="button" data-platform="windows" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-Setup-0.3.6-x64.exe">Download for Windows</a>
+        <a class="button" data-platform="mac" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-0.3.6-macos-arm64.dmg">Download for Mac</a>
+        <a class="button" data-platform="linux" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-0.3.6-linux-x86_64.AppImage">Download for Linux &amp; Steam Deck</a>
+        <a class="button" data-platform="linux_arm64" href="https://cdn.privateer-reimagined.com/launcher/PrivateerReimagined-0.3.6-linux-arm64.AppImage">Linux ARM64</a>
+        <p class="get-note">Version 0.3.6 for Windows 10 and 11, Macs with Apple silicon, and Linux on
+          x86_64 (including the Steam Deck) or ARM64.
           <a href="#install">What to expect when installing</a>. Questions?
           <a href="https://discord.gg/9Vhm4tdymY">Join the Discord</a>.</p>
       </div>
@@ -164,7 +167,8 @@
       <ol class="steps">
         <li>
           <h3>Download the launcher</h3>
-          <p>It's a 3 to 4 MB download. It doesn't need administrator rights.</p>
+          <p>It's a 3 to 4 MB download, about 85 MB on Linux, where it brings its own web view. It
+            doesn't need administrator rights.</p>
         </li>
         <li class="heads-up">
           <h3>Open it</h3>
@@ -175,9 +179,15 @@
             notarized by Apple yet. Click <strong>Done</strong>, open <strong>System Settings</strong>,
             go to <strong>Privacy &amp; Security</strong>, scroll down and click <strong>Open
             Anyway</strong>, then confirm. You only do this once; updates install themselves.</p>
+          <p><strong>Linux and Steam Deck:</strong> make the AppImage executable (right-click it,
+            <strong>Properties</strong>, <strong>Permissions</strong>, or <code>chmod +x</code>) and run it.
+            On the Deck, do this in Desktop Mode, then add it to Steam as a non-Steam game to start it
+            from Game Mode.</p>
           <p class="hash">To check your download, its SHA-256 is
-            <span>for Windows: <code data-platform="windows">15f5fbdc373696a3731cb749707eaaf6f59555b21420a4c3bb85d9fd140a1037</code></span>
-            <span>for Mac: <code data-platform="mac">8fc87edf9ee301db45d983f6384e095bff7c4f6d27967ce4658bb3433d8132d4</code></span></p>
+            <span>for Windows: <code data-platform="windows">13ebec5f252e5aad51d66094f95e4a46d6e749fada8dfdf1ea05a39c6f1ed017</code></span>
+            <span>for Mac: <code data-platform="mac">4fbe8c36ba887a4d5ee205fdcde2cbea04826b1f901355bd4c06553b70d8f454</code></span>
+            <span>for Linux: <code data-platform="linux">c252e9c21a9b3e1fe3c2038cc5ee4b9e48e8bc74335af5414038042ed39e87fe</code></span>
+            <span>for Linux ARM64: <code data-platform="linux_arm64">93f435b8540a67e1a2b3abba8fee0d00fcc471a001a3695422aeedfaf1ee369b</code></span></p>
         </li>
         <li>
           <h3>Show it your Privateer</h3>
@@ -194,7 +204,8 @@
         <h3 id="needs-title">You'll need</h3>
         <ul>
           <li><em>Wing Commander: Privateer</em> on GOG or Steam</li>
-          <li>Windows 10 or 11, 64-bit, or a Mac with Apple silicon</li>
+          <li>Windows 10 or 11, 64-bit, a Mac with Apple silicon, or Linux on x86_64 or ARM64
+            (glibc 2.39 or newer), such as SteamOS on the Steam Deck</li>
           <li>About 4 GB of free space</li>
         </ul>
       </aside>
