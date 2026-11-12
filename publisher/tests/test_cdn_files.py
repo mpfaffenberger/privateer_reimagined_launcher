@@ -52,6 +52,17 @@ def test_cli_uploads_several(tmp_path):
     assert len(LocalStore(tmp_path / "cdn").keys("site/video")) == 2
 
 
+def test_a_tar_gz_keeps_its_double_suffix(tmp_path):
+    """Game #1508: standalone packages are <name>.tar.gz; the hash goes before the suffix."""
+    store = LocalStore(tmp_path / "cdn")
+    pkg = clip(tmp_path, b"\x1f\x8b package", "privateer-reimagined-1.0-linux-x86_64.tar.gz")
+    url = cdn_files.upload_file(store, pkg, "packages/game", log=quiet)
+    sha10 = hashlib.sha256(pkg.read_bytes()).hexdigest()[:10]
+    key = f"packages/game/privateer-reimagined-1.0-linux-x86_64-{sha10}.tar.gz"
+    assert url == f"{cdn_files.CDN}/{key}" and store.get(key) == pkg.read_bytes()
+    assert content_type(key) == "application/gzip"
+
+
 def test_video_content_types():
     assert content_type("site/video/x-0123456789.webm") == "video/webm"
     assert content_type("site/video/x-0123456789.mp4") == "video/mp4"

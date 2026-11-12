@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 from pathlib import Path
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 
 class Store(Protocol):
@@ -13,6 +13,7 @@ class Store(Protocol):
     def keys(self, prefix: str) -> set[str]: ...
     def exists(self, key: str) -> bool: ...
     def get(self, key: str) -> bytes: ...
+    def open(self, key: str) -> BinaryIO: ...   # a stream, for objects too big to hold in memory
     def put_bytes(self, key: str, data: bytes) -> None: ...
     def put_file(self, key: str, path: Path) -> None: ...
     def local_path(self, key: str) -> Path | None: ...
@@ -42,6 +43,9 @@ class LocalStore:
 
     def get(self, key: str) -> bytes:
         return self._path(key).read_bytes()
+
+    def open(self, key: str) -> BinaryIO:
+        return self._path(key).open("rb")
 
     def put_bytes(self, key: str, data: bytes) -> None:
         dest = self._path(key)
@@ -123,6 +127,9 @@ class R2Store:
 
     def get(self, key: str) -> bytes:
         return self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+
+    def open(self, key: str) -> BinaryIO:
+        return self.s3.get_object(Bucket=self.bucket, Key=key)["Body"]
 
     def put_bytes(self, key: str, data: bytes) -> None:
         self.s3.put_object(Bucket=self.bucket, Key=key, Body=data, CacheControl=cache_control(key),

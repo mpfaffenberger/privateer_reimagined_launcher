@@ -41,7 +41,7 @@ impl TestStore {
     /// same on Windows and the macOS CI). Names ending in `.raw` are stored raw, everything
     /// else zstd, to exercise both encodings.
     pub fn publish(&self, version: &str, files: &[(&str, &[u8])]) -> Vec<u8> {
-        self.publish_for(version, files, &["windows", "macos", "linux"])
+        self.publish_for(version, files, &["windows", "macos", "linux", "linux-arm64"])
     }
 
     /// Like `publish`, with a launch entry only for the given OSes (#66).

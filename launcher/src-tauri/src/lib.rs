@@ -176,7 +176,8 @@ struct UpdateInfo {
 async fn check_update(repair: bool, state: State<'_, AppState>) -> Result<UpdateInfo, String> {
     let _busy = begin(&state)?;
     let installer = Arc::new(state.installer());
-    // This OS's channel: `stable` on Windows, `stable-macos` on a Mac (#66).
+    // This platform's channel: `stable` on Windows, `stable-macos` on a Mac (#66),
+    // `stable-linux` on x86_64 Linux (the Steam Deck), `stable-linux-arm64` on ARM64 (#162).
     let release = match installer.check(&prl_core::format::platform_channel(CHANNEL)).await {
         Err(prl_core::Error::NoRelease(_)) => {
             *state.release.lock().unwrap() = None;
@@ -337,6 +338,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             let config_path = app.path().app_config_dir()?.join("launcher.json");
+            // %LOCALAPPDATA% on Windows, ~/Library/Application Support on macOS, and on Linux
+            // the XDG data dir: $XDG_DATA_HOME, else ~/.local/share (#162).
             let default_install_dir = app.path().local_data_dir()?.join("Privateer Reimagined");
             let config = std::fs::read(&config_path)
                 .ok()

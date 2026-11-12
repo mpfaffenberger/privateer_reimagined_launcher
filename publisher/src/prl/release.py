@@ -38,6 +38,12 @@ def sha256_file(path: Path) -> tuple[str, int]:
     return h.hexdigest(), size
 
 
+def file_content(store: Store, f: FileEntry) -> bytes:
+    """A release file's bytes, decoded from its blob. Unchecked: callers compare the hash."""
+    raw = store.get(f.blob_key())
+    return zstandard.ZstdDecompressor().decompressobj().decompress(raw) if f.enc == "zstd" else raw
+
+
 def blob_index(store: Store) -> dict[str, tuple[str, int]]:
     """sha256 -> (enc, stored_size) for every blob in `store`, from one listing."""
     index: dict[str, tuple[str, int]] = {}
@@ -251,11 +257,8 @@ def verify(store: Store, channel: str, public_b64: str, deep: bool = False, log=
             problems.append(f"missing blob for {f.path}")
         elif present[f.blob_key()] != f.stored_size:
             problems.append(f"blob for {f.path} has the wrong size")
-        elif deep:
-            raw = store.get(f.blob_key())
-            body = zstandard.ZstdDecompressor().decompressobj().decompress(raw) if f.enc == "zstd" else raw
-            if hashlib.sha256(body).hexdigest() != f.sha256:
-                problems.append(f"blob content mismatch for {f.path}")
+        elif deep and hashlib.sha256(file_content(store, f)).hexdigest() != f.sha256:
+            problems.append(f"blob content mismatch for {f.path}")
     log(f"[verify] {channel} -> {manifest.version}: {len(manifest.files)} files, "
         f"{'OK' if not problems else str(len(problems)) + ' problem(s)'}")
     return problems

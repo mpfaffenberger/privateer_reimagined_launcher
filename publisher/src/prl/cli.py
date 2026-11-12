@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import cdn_files, ci, config, launcher_dist, release, sign
+from . import cdn_files, ci, config, launcher_dist, package, release, sign
 from .store import LocalStore, open_store
 
 # Where the release signing key lives on the publishing machine (docs/DESIGN.md).
@@ -25,7 +25,8 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--version", required=True)
     b.add_argument("--channel", default="stable")
     b.add_argument("--os", dest="os_name", default="windows", choices=config.OSES,
-                   help="which OS the release is for; non-Windows channels end in -<os> (e.g. stable-macos)")
+                   help="which platform the release is for; non-Windows channels end in -<platform> "
+                        "(e.g. stable-macos, stable-linux-arm64)")
     b.add_argument("--store", type=Path, default=Path("dist/store"))
     signing = b.add_mutually_exclusive_group()
     signing.add_argument("--key", type=Path, default=DEFAULT_KEY)
@@ -74,6 +75,11 @@ def main(argv: list[str] | None = None) -> int:
     f.add_argument("--prefix", required=True, help="key prefix, e.g. site/video")
     f.add_argument("--to", required=True, help="'r2' or a local directory")
 
+    pk = sub.add_parser("package", help="a release as one standalone .tar.gz, from blobs already in a store")
+    pk.add_argument("--manifest", type=Path, required=True, help="the release's manifest JSON")
+    pk.add_argument("--from", dest="src", required=True, help="'r2' or a local directory holding its blobs")
+    pk.add_argument("--out", type=Path, required=True, help="<name>.tar.gz; it unpacks into <name>/")
+
     a = ap.parse_args(argv)
     if a.cmd == "keygen":
         pub = sign.keygen(a.out)
@@ -99,6 +105,8 @@ def main(argv: list[str] | None = None) -> int:
             launcher_dist.upload_installer(store, a.installer, a.version, a.notes)
         if a.macos_archive:
             launcher_dist.upload_macos(store, a.macos_archive, a.macos_dmg, a.version, a.notes)
+    elif a.cmd == "package":
+        package.package(a.manifest.read_bytes(), open_store(a.src), a.out)
     elif a.cmd == "upload-file":
         store = open_store(a.to)
         for path in a.files:

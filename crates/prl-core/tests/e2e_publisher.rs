@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
+use prl_core::format::{platform_channel, PLATFORM};
 use prl_core::install::{Installer, Mode};
 use prl_core::source::Source;
 
@@ -34,8 +35,11 @@ async fn rust_core_installs_what_the_python_publisher_publishes() {
     std::fs::write(game.join("assets/model.blend"), b"never shipped").unwrap();
     let cfg = t.path().join("release.toml");
     let posix = |p: &Path| p.to_string_lossy().replace('\\', "/");
+    // Published for this machine's platform on its channel, as release.yml does (#66, #162),
+    // so the launcher here accepts it: on Linux ARM64 this is the linux-arm64 contract.
+    let channel = platform_channel("stable");
     std::fs::write(&cfg, format!(
-        "product = \"privateer-reimagined\"\n[launch]\nwindows = \"new_privateer.exe\"\n\
+        "product = \"privateer-reimagined\"\n[launch]\n{PLATFORM} = \"new_privateer.exe\"\n\
          [[source]]\nfrom = \"{}\"\nto = \"new_privateer.exe\"\n\
          [[source]]\nfrom = \"{}\"\nto = \"assets\"\nexclude = [\"**/*.blend\"]\n",
         posix(&game.join("new_privateer.exe")), posix(&game.join("assets")))).unwrap();
@@ -46,12 +50,14 @@ async fn rust_core_installs_what_the_python_publisher_publishes() {
     let local = t.path().join("local_store");
     let remote = t.path().join("remote");
     let s = |p: &Path| p.to_string_lossy().to_string();
-    prl(&["build", "--config", &s(&cfg), "--version", "1.0.0", "--store", &s(&local), "--key", &s(&key)]);
+    let build = |version: &str| prl(&["build", "--config", &s(&cfg), "--version", version, "--os", PLATFORM,
+                                      "--channel", &channel, "--store", &s(&local), "--key", &s(&key)]);
+    build("1.0.0");
     prl(&["publish", "--version", "1.0.0", "--from", &s(&local), "--to", &s(&remote)]);
 
     let install_dir = t.path().join("install");
     let inst = Installer::new(Source::Dir(remote.clone()), pubkey.clone(), &install_dir);
-    let release = inst.check("stable").await.expect("rust verifies python's signature + formats");
+    let release = inst.check(&channel).await.expect("rust verifies python's signature + formats");
     let plan = inst.plan(&release, Mode::Update).unwrap();
     inst.apply(&release, &plan, Arc::new(|_| {})).await.unwrap();
     assert_eq!(std::fs::read(install_dir.join("new_privateer.exe")).unwrap(), b"MZ release one");
@@ -61,9 +67,9 @@ async fn rust_core_installs_what_the_python_publisher_publishes() {
 
     // Release two changes only the exe: exactly one blob travels.
     std::fs::write(game.join("new_privateer.exe"), b"MZ release two").unwrap();
-    prl(&["build", "--config", &s(&cfg), "--version", "1.0.1", "--store", &s(&local), "--key", &s(&key)]);
+    build("1.0.1");
     prl(&["publish", "--version", "1.0.1", "--from", &s(&local), "--to", &s(&remote)]);
-    let release = inst.check("stable").await.unwrap();
+    let release = inst.check(&channel).await.unwrap();
     assert_eq!(release.manifest.version, "1.0.1");
     let plan = inst.plan(&release, Mode::Update).unwrap();
     assert_eq!(plan.fetch.len(), 1);

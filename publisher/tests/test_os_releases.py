@@ -60,6 +60,8 @@ def test_each_os_gets_its_binary_shared_assets_and_only_its_launch_entry(tmp_pat
     ("stable", "macos"),          # would offer a Mac build to every Windows launcher
     ("stable-macos", "windows"),  # and a Windows build to every Mac
     ("beta-linux", "macos"),
+    ("stable-linux", "linux-arm64"),   # an ARM64 game on every Steam Deck (#162)
+    ("stable-linux-arm64", "linux"),   # and an x86_64 game on every ARM64 machine
 ])
 def test_a_build_only_goes_to_its_own_oss_channel(tmp_path, game, channel, os_name):
     with pytest.raises(ValueError, match="must go to"):
@@ -84,6 +86,55 @@ def test_config_errors(tmp_path, game):
     bad.write_text(cfg.read_text().replace('os = "macos"', 'os = "macosx"'))
     with pytest.raises(ValueError, match="unknown OS 'macosx'"):
         config.load(bad, "windows")
+
+
+def linux_config(tmp_path, game):
+    """#162: both Linux arches from one source, as the real release.toml has it."""
+    (game / "new_privateer").write_bytes(b"\x7fELF" + b"\x00" * 4096)
+    cfg = tmp_path / "linux.toml"
+    cfg.write_text(f'''
+product = "privateer-reimagined"
+[launch]
+linux = "new_privateer"
+linux-arm64 = "new_privateer"
+[[source]]
+os = ["linux", "linux-arm64"]
+from = "{(game / 'new_privateer').as_posix()}"
+to = "new_privateer"
+[[source]]
+from = "{(game / 'assets').as_posix()}"
+to = "assets"
+''')
+    return cfg
+
+
+def test_each_linux_arch_is_its_own_platform_on_its_own_channel(tmp_path, game):
+    cfg = linux_config(tmp_path, game)
+    x86, store = build(tmp_path, cfg, "stable-linux", "linux", "1.0.0-linux")
+    arm, _ = build(tmp_path, cfg, "stable-linux-arm64", "linux-arm64", "1.0.0-linux-arm64", store)
+    assert json.loads(x86.to_bytes())["launch"] == {"linux": "new_privateer"}
+    assert json.loads(arm.to_bytes())["launch"] == {"linux-arm64": "new_privateer"}
+    assert {f.path for f in x86.files} == {f.path for f in arm.files}
+    assert (x86.channel, arm.channel) == ("stable-linux", "stable-linux-arm64")
+
+
+def test_channel_os_tells_the_linux_arches_apart():
+    assert config.channel_os("stable-linux") == "linux"
+    assert config.channel_os("stable-linux-arm64") == "linux-arm64"
+    assert config.channel_os("stable-macos") == "macos"
+    assert config.channel_os("stable") == "windows"
+
+
+@pytest.mark.parametrize("value, error", [
+    ('[]', "non-empty list"),
+    ('["linux", "amiga"]', "unknown OS 'amiga'"),
+    ('3', "must be a platform"),
+])
+def test_a_bad_source_os_list_is_refused(tmp_path, game, value, error):
+    cfg = linux_config(tmp_path, game)
+    cfg.write_text(cfg.read_text().replace('os = ["linux", "linux-arm64"]', f"os = {value}"))
+    with pytest.raises(ValueError, match=error):
+        config.load(cfg, "linux")
 
 
 def test_a_launch_target_missing_from_the_release_is_refused(tmp_path, game):

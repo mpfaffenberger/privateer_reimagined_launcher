@@ -156,7 +156,7 @@ async fn a_release_for_another_os_is_refused_and_the_install_is_untouched() {
     let inst = installer(&store, game.path());
     install(&inst, Mode::Update).await;
 
-    let others: Vec<&str> = ["windows", "macos", "linux"].into_iter().filter(|o| *o != prl_core::format::OS).collect();
+    let others: Vec<&str> = ["windows", "macos", "linux", "linux-arm64"].into_iter().filter(|o| *o != prl_core::format::PLATFORM).collect();
     store.publish_for("2.0.0", &[("game", b"not for this OS")], &others);
     match inst.check("stable").await {
         Err(Error::Format(why)) => assert!(why.contains("isn't built for"), "{why}"),

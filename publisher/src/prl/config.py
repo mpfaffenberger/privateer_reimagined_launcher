@@ -17,9 +17,11 @@
 Relative `from` paths resolve against the config file's folder; ${VARS} come from the
 environment, and an unset one is an error rather than a silently wrong path.
 
-One file describes every OS (#66). A source with `os = "macos"` (or windows, linux) is only
-in that OS's release; one without `os` is in all of them. `[launch]` has an entry per OS, and
-a release keeps only its own.
+One file describes every platform (#66): an OS, plus the CPU for ARM64 Linux (#162), whose
+game can't run on the Steam Deck's x86_64 Linux or the other way round. A source with
+`os = "macos"` is only in that platform's release, `os = ["linux", "linux-arm64"]` in each one
+listed, and one without `os` in all of them. `[launch]` has an entry per platform, and a
+release keeps only its own.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ from pathlib import Path
 from . import paths
 
 
-OSES = ("windows", "macos", "linux")   # as prl-core's format::OS names them
+OSES = ("windows", "macos", "linux", "linux-arm64")   # as prl-core's format::PLATFORM names them
 
 
 @dataclass
@@ -50,8 +52,8 @@ def check_os(os_name: str) -> str:
 
 
 def channel_os(channel: str) -> str:
-    """The OS whose launchers read `channel`: Windows reads the bare name (`stable`), others
-    `<channel>-<os>` (prl-core's platform_channel)."""
+    """The platform whose launchers read `channel`: Windows reads the bare name (`stable`),
+    others `<channel>-<os>` (prl-core's platform_channel)."""
     return next((o for o in OSES if channel.endswith(f"-{o}")), "windows")
 
 
@@ -89,6 +91,14 @@ def glob_to_regex(pattern: str) -> re.Pattern[str]:
     return re.compile(out + r"\Z", re.IGNORECASE)
 
 
+def source_oses(value: str | list[str]) -> list[str]:
+    """A source's `os`: one platform or a list of them, each checked."""
+    names = [value] if isinstance(value, str) else value
+    if not isinstance(names, list) or not names:
+        raise ValueError(f"a source's os must be a platform or a non-empty list of them, not {value!r}")
+    return [check_os(n) for n in names]
+
+
 def _expand(value: str) -> str:
     expanded = os.path.expandvars(value)
     if "$" in expanded:
@@ -103,7 +113,7 @@ def load(path: Path, os_name: str = "windows") -> ReleaseConfig:
     base = Path(path).resolve().parent
     sources = []
     for s in doc.get("source", []):
-        if "os" in s and check_os(s["os"]) != os_name:
+        if "os" in s and os_name not in source_oses(s["os"]):
             continue
         # Expand only what this OS ships: the other OS's build output needn't exist here.
         src = Path(_expand(s["from"]))
