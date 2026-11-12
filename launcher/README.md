@@ -78,17 +78,42 @@ The `linux` workflow builds an AppImage and a `.deb` on x86_64 and on ARM64 (art
 `privateer-launcher-linux-<arch>-<sha>`). A launcher installs the game build for the CPU it was
 built for: x86_64 reads `stable-linux`, ARM64 `stable-linux-arm64` (`prl_core::format::PLATFORM`),
 and it refuses a release with no launch entry for its platform, so a Windows, macOS or
-other-arch game is never installed. To build one locally (Tauri's Linux prerequisites installed):
-`npx tauri build --bundles appimage,deb --config '{"bundle":{"createUpdaterArtifacts":false}}'`.
+other-arch game is never installed.
+
+**Built for an old glibc (#171).** An AppImage brings its own libraries but uses the system's
+glibc, so it needs at least the glibc it was built against: 0.3.6, built on Ubuntu 24.04, needed
+2.39 and the Steam Deck refused it ("GLIBC_2.38 not found"). So both AppImages are built in the
+`manylinux_2_28` container (AlmaLinux 8, glibc 2.28), never on the runner itself:
+
+- `linux/build-webkit.sh` builds WebKitGTK 4.1 there, with the glib, libsoup 3 and GTK 3.24 it
+  and Tauri need. No distro with glibc 2.28 packages webkit2gtk-4.1, so it follows RHEL 8's own
+  WebKitGTK build. That takes hours on a hosted runner, so CI caches the result, keyed on the
+  container image, that script and `linux/manylinux-deps.sh`.
+- `linux/build-appimage.sh` builds the launcher against it.
+- `linux/check-glibc-floor.sh` fails the build if any ELF in the AppImage (the launcher, WebKit's
+  helpers, every bundled library) needs a glibc newer than 2.28.
+
+To build one the same way (Docker; WebKit takes about 40 minutes on a 16-core desktop and a few
+hours on a hosted runner):
+
+```sh
+docker run --rm -v "$PWD":/src -w /src quay.io/pypa/manylinux_2_28_x86_64:2026.11.07-1 bash -c \
+  'bash launcher/linux/manylinux-deps.sh && bash launcher/linux/build-webkit.sh webkit-stage &&
+   bash launcher/linux/build-appimage.sh webkit-stage'
+```
+
+A plain `npx tauri build --bundles appimage,deb --config '{"bundle":{"createUpdaterArtifacts":false}}'`
+(Tauri's Linux prerequisites installed) works for trying it out, but needs your own glibc.
 
 **Steam Deck** (x86_64, SteamOS): in Desktop Mode, mark the AppImage executable (Properties >
 Permissions) and run it; to start it from Game Mode, add it as a non-Steam game. Caveats:
 
 - The AppImage needs FUSE 2, which SteamOS ships. Where it's missing, run it with
   `--appimage-extract-and-run`.
-- An AppImage needs at least the glibc of the system it was built on (`ldd --version` shows
-  the Deck's). The x86_64 one is built on Ubuntu 24.04, so it needs glibc 2.39 or newer, like
-  the game's Linux releases (#163).
+- It needs glibc 2.28 or newer (`ldd --version`), which SteamOS clears; 0.3.6 needed 2.39 (#171).
+- Its WebKit uses the OpenSSL bundled from AlmaLinux 8, which looks for CA certificates where RHEL
+  keeps them, so the AppImage sets `SSL_CERT_FILE` to this system's bundle unless you set it
+  (`src-tauri/src/appimage.rs`).
 - If the window stays blank (WebKitGTK and some GPU drivers), start it with
   `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 - Started from Game Mode, the game it launches runs inside Steam's session as the launcher's

@@ -3,6 +3,12 @@
 # (`stable-linux` or `stable-linux-arm64`, prl-core's format::PLATFORM), so the Deck never
 # fetches an ARM64 game build and vice versa.
 #
+# What players download is built in the manylinux_2_28 container (AlmaLinux 8, glibc 2.28),
+# never on the runner (#171). An AppImage brings its own libraries but uses the system's glibc,
+# so it needs at least the glibc it was built against: built on Ubuntu 24.04, 0.3.6 needed
+# 2.39 and the Steam Deck refused it ("GLIBC_2.38 not found"). check-glibc-floor.sh fails the
+# build if any ELF in the AppImage needs more than 2.28. The tests stay on the runner.
+#
 # Like macOS, the updater signature is NOT made here: the updater key stays on Mike's
 # machine. On Linux the AppImage itself is what tauri-plugin-updater downloads.
 name: linux
@@ -14,37 +20,37 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: linux-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
+# Concurrency is per job, not per workflow: cancelling a run mid-way through the WebKit build
+# would throw away hours of work before it reaches the cache.
 jobs:
-  test-and-build:
-    name: test-and-build (${{ matrix.arch }})
+  test:
+    name: test (${{ matrix.arch }})
     strategy:
       # Each arch reports on its own: an ARM-only failure must not hide the x86_64 result.
       fail-fast: false
       matrix:
         include:
-          # Pinned, not ubuntu-latest (#163): an AppImage needs at least the glibc it was built
-          # against, and these artifacts are what players download. 24.04's 2.39 suits SteamOS.
+          # Pinned, never ubuntu-latest (#163). Only the tests run on the runner itself.
           - arch: x86_64
             runner: ubuntu-24.04
           - arch: arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
+    concurrency:
+      group: linux-test-${{ matrix.arch }}-${{ github.ref }}
+      cancel-in-progress: true
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      # Tauri v2's Linux prerequisites (WebKitGTK 4.1 etc.); `file` is used by the AppImage bundler.
+      # Tauri v2's Linux prerequisites (WebKitGTK 4.1 etc.), for the launcher's Rust tests.
       - name: Linux build dependencies
         run: |
           sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends build-essential file patchelf \
+          sudo apt-get install -y -q --no-install-recommends build-essential file \
             libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev
 
       - name: Rust toolchain
@@ -62,20 +68,80 @@ jobs:
       - name: Rust tests (prl-core, launcher)
         run: cargo test -p prl-core -p privateer-launcher
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+  # WebKitGTK 4.1 for manylinux_2_28 (launcher/linux/build-webkit.sh), cached: it takes hours.
+  # The key is the image and the two scripts that decide what gets built.
+  webkit:
+    name: webkit (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix: &manylinux
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            image: quay.io/pypa/manylinux_2_28_x86_64:2026.11.07-1
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            image: quay.io/pypa/manylinux_2_28_aarch64:2026.11.07-1
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    # A newer run waits for this one's cache instead of building WebKit again beside it.
+    concurrency:
+      group: linux-webkit-${{ matrix.arch }}-${{ github.ref }}
+      cancel-in-progress: false
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
 
-      # NO_STRIP: linuxdeploy's bundled strip can't read Ubuntu 24.04's newer ELF sections.
-      # APPIMAGE_EXTRACT_AND_RUN: the runners have no FUSE for the AppImage tooling itself.
-      - name: Build the unsigned launcher (.AppImage + .deb)
-        working-directory: launcher
-        env:
-          NO_STRIP: "true"
-          APPIMAGE_EXTRACT_AND_RUN: "1"
+      - name: Look up the cached WebKit build
+        id: cache
+        uses: actions/cache/restore@v4
+        with:
+          path: webkit-stage
+          key: &webkit-key webkit-${{ matrix.image }}-${{ hashFiles('launcher/linux/manylinux-deps.sh', 'launcher/linux/build-webkit.sh') }}
+          lookup-only: true
+
+      - name: Build glib, libsoup 3, GTK 3.24 and WebKitGTK 4.1
+        if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          npm ci
-          npx tauri build --bundles appimage,deb --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          bash launcher/linux/manylinux-deps.sh
+          bash launcher/linux/build-webkit.sh webkit-stage
+
+      # Saved straight away, so a later failure in this run can't lose it.
+      - name: Cache the WebKit build
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: webkit-stage
+          key: *webkit-key
+
+  appimage:
+    name: appimage (${{ matrix.arch }})
+    needs: webkit
+    strategy:
+      fail-fast: false
+      matrix: *manylinux
+    runs-on: ${{ matrix.runner }}
+    container: ${{ matrix.image }}
+    concurrency:
+      group: linux-appimage-${{ matrix.arch }}-${{ github.ref }}
+      cancel-in-progress: true
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the WebKit build
+        uses: actions/cache/restore@v4
+        with:
+          path: webkit-stage
+          key: *webkit-key
+          fail-on-cache-miss: true
+
+      - name: Build the unsigned launcher (.AppImage + .deb)
+        run: bash launcher/linux/build-appimage.sh webkit-stage
+
+      # The Steam Deck gate: the launcher binary, WebKit's helpers and every bundled library.
+      - name: Check the AppImage needs glibc 2.28 at most
+        run: bash launcher/linux/check-glibc-floor.sh target/release/bundle/appimage/*.AppImage 2.28
 
       - name: Upload the AppImage + .deb
         uses: actions/upload-artifact@v4

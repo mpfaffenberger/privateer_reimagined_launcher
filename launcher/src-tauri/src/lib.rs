@@ -1,6 +1,9 @@
 //! Tauri commands over prl-core (#4). The UI only renders state; every rule lives here:
 //! the ownership gate, the release key, one operation at a time.
 
+#[cfg(target_os = "linux")]
+mod appimage;
+
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -332,6 +335,8 @@ async fn launch_game(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    appimage::use_system_ca_bundle();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
